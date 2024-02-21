@@ -6,11 +6,11 @@ import (
 	"log"
 	"os"
 
-	"github.com/0xsequence/go-cloudsecrets/_examples/config"
-
 	"cloud.google.com/go/compute/metadata"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	"github.com/0xsequence/go-cloudsecrets/_examples/config"
 	"github.com/0xsequence/go-cloudsecrets/cloudsecrets"
+	"github.com/kr/pretty"
 )
 
 var cfg = &config.Config{
@@ -46,5 +46,5 @@ func main() {
 		log.Fatal("failed to replace secret placeholders with real values:", err)
 	}
 
-	fmt.Printf("%v", cfg)
+	fmt.Printf("%# v", pretty.Formatter(cfg))
 }

@@ -10,6 +10,7 @@ import (
 type config struct {
 	DB        db
 	Analytics analytics
+	Pass      string
 }
 
 type db struct {
@@ -49,8 +50,10 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 			storage: NewMockSecretStorage(map[string]string{
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
+				"pass":              "secret",
 			}),
 			conf: &config{
+				Pass: "SECRET:pass",
 				DB: db{
 					Host:     "localhost:9090",
 					Username: "postgres",
@@ -64,6 +67,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 			},
 			wantErr: false,
 			wantConf: &config{
+				Pass: "secret",
 				DB: db{
 					Host:     "localhost:9090",
 					Username: "postgres",
