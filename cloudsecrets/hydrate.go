@@ -21,6 +21,10 @@ func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any
 		v = v.Elem()
 	}
 
+	if v.Kind() != reflect.Struct {
+		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
+	}
+
 	return processConfig(ctx, secretStorage, v)
 }
 
