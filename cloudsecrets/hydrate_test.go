@@ -24,6 +24,16 @@ type analytics struct {
 	AuthToken string
 }
 
+func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
+	input := "hello"
+	storage := NewMockSecretStorage(map[string]string{
+		"dbPassword":        "changethissecret",
+		"analyticsPassword": "AuthTokenSecret",
+	})
+
+	assert.Error(t, HydrateSecrets(context.Background(), storage, input))
+}
+
 func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 	ctx := context.Background()
 
