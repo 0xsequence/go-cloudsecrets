@@ -58,7 +58,7 @@ func hydrateStructFields(ctx context.Context, storage SecretStorage, config refl
 				if !found {
 					return fmt.Errorf("invalid config format: %s", field.String())
 				}
-				secretValue, err := storage.FetchSecret(ctx, secretName, "latest")
+				secretValue, err := storage.FetchSecret(ctx, secretName)
 				if err != nil {
 					return err
 				}

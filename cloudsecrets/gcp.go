@@ -21,10 +21,8 @@ func NewGCPSecretStorage(projectId string, client *secretmanager.Client) *GCPSec
 	}
 }
 
-func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string, versionId string) (string, error) {
-	if versionId == "" {
-		versionId = "latest"
-	}
+func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string) (string, error) {
+	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
 		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", storage.projectId, secretId, versionId),
