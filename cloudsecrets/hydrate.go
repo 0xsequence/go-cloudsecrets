@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func ReplacePlaceholdersWithSecrets(ctx context.Context, secretStorage SecretStorage, config any) error {
+func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any) error {
 	v := reflect.ValueOf(config)
 
 	if v.Kind() == reflect.Ptr {

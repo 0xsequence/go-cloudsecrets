@@ -90,7 +90,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ReplacePlaceholdersWithSecrets(ctx, tt.storage, tt.conf)
+			err := HydrateSecrets(ctx, tt.storage, tt.conf)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
