@@ -54,7 +54,7 @@ func hydrateStructFields(ctx context.Context, storage SecretStorage, config refl
 			}
 
 			if field.Kind() == reflect.String && field.CanSet() && strings.Contains(field.String(), "SECRET") {
-				_, secretName, found := strings.Cut(field.String(), ":")
+				secretName, found := strings.CutPrefix(field.String(), "SECRET:")
 				if !found {
 					return fmt.Errorf("invalid config format: %s", field.String())
 				}
