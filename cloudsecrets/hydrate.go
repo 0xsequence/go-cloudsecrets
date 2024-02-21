@@ -54,7 +54,7 @@ func processConfig(ctx context.Context, storage SecretStorage, config reflect.Va
 				if !found {
 					return fmt.Errorf("invalid config format: %s", field.String())
 				}
-				secretValue, err := storage.FetchSecret(ctx, secretName)
+				secretValue, err := storage.FetchSecret(ctx, secretName, "latest")
 				if err != nil {
 					return err
 				}
