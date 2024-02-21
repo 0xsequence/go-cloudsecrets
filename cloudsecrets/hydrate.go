@@ -31,33 +31,32 @@ func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any
 func hydrateStructFields(ctx context.Context, storage SecretStorage, config reflect.Value) error {
 	g, ctx := errgroup.WithContext(ctx)
 	var mux sync.Mutex
-
 	for i := 0; i < config.NumField(); i++ {
 		field := config.Field(i)
-		g.Go(func() error {
-			if field.Kind() == reflect.Ptr {
-				if field.IsNil() {
-					return nil
-				}
-				// Dereference pointer
-				field = field.Elem()
+
+		if field.Kind() == reflect.Ptr {
+			if field.IsNil() {
+				continue
+			}
+			// Dereference pointer
+			field = field.Elem()
+		}
+
+		if field.Kind() == reflect.Struct {
+			err := hydrateStructFields(ctx, storage, field)
+			if err != nil {
+				return fmt.Errorf("failed to process config: %w", err)
+			}
+			continue
+		}
+
+		if field.Kind() == reflect.String && field.CanSet() && strings.Contains(field.String(), "SECRET") {
+			secretName, found := strings.CutPrefix(field.String(), "SECRET:")
+			if !found {
+				return fmt.Errorf("invalid config format: %s", field.String())
 			}
 
-			if field.Kind() == reflect.Struct {
-				mux.Lock()
-				err := hydrateStructFields(ctx, storage, field)
-				mux.Unlock()
-				if err != nil {
-					return fmt.Errorf("failed to process config: %w", err)
-				}
-				return nil
-			}
-
-			if field.Kind() == reflect.String && field.CanSet() && strings.Contains(field.String(), "SECRET") {
-				secretName, found := strings.CutPrefix(field.String(), "SECRET:")
-				if !found {
-					return fmt.Errorf("invalid config format: %s", field.String())
-				}
+			g.Go(func() error {
 				secretValue, err := storage.FetchSecret(ctx, secretName)
 				if err != nil {
 					return err
@@ -65,11 +64,11 @@ func hydrateStructFields(ctx context.Context, storage SecretStorage, config refl
 				mux.Lock()
 				field.SetString(secretValue)
 				mux.Unlock()
-			}
-			return nil
-		})
-	}
 
+				return nil
+			})
+		}
+	}
 	if err := g.Wait(); err != nil {
 		return err
 	}
