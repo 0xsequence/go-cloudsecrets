@@ -30,6 +30,8 @@ func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string
 		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", storage.projectId, secretId, versionId),
 	}
 
+	fmt.Println("secret: ", req.Name)
+
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
