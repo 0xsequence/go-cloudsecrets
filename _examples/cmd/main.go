@@ -33,7 +33,7 @@ func main() {
 	if metadata.OnGCE() {
 		projectId, err = metadata.ProjectID()
 		if err != nil {
-			log.Fatal("failed to get project ID from metadata:", err)
+			log.Fatal("failed to get project ID from metadata: ", err)
 		}
 	} else {
 		projectId = os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -43,7 +43,7 @@ func main() {
 	// cfg = application config can be any struct
 	err = cloudsecrets.HydrateSecrets(context.Background(), secretStorageClient, cfg)
 	if err != nil {
-		log.Fatal("failed to replace secret placeholders with real values:", err)
+		log.Fatal("failed to replace secret placeholders with real values: ", err)
 	}
 
 	fmt.Printf("%# v", pretty.Formatter(cfg))

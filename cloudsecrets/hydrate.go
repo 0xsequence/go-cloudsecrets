@@ -6,31 +6,45 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-
-	"golang.org/x/sync/errgroup"
 )
 
 func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any) error {
-	v := reflect.ValueOf(config)
+	configValue := reflect.ValueOf(config)
 
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
+	if configValue.Kind() == reflect.Ptr {
+		if configValue.IsNil() {
 			return fmt.Errorf("passed config is nil")
 		}
 
-		v = v.Elem()
+		configValue = configValue.Elem()
 	}
 
-	if v.Kind() != reflect.Struct {
-		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
+	if configValue.Kind() != reflect.Struct {
+		return fmt.Errorf("passed config must be struct, actual %s", configValue.Kind())
 	}
 
-	return hydrateStructFields(ctx, secretStorage, v)
+	errCh := make(chan error)
+	wg := &sync.WaitGroup{}
+	hydrateStructFields(ctx, secretStorage, configValue, wg, errCh)
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	select {
+	case err, ok := <-errCh:
+		if !ok {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("failed to process config: %w", err)
+		}
+	}
+
+	return nil
 }
 
-func hydrateStructFields(ctx context.Context, storage SecretStorage, config reflect.Value) error {
-	g, ctx := errgroup.WithContext(ctx)
-	var mux sync.Mutex
+func hydrateStructFields(ctx context.Context, storage SecretStorage, config reflect.Value, wg *sync.WaitGroup, errCh chan error) {
 	for i := 0; i < config.NumField(); i++ {
 		field := config.Field(i)
 
@@ -43,34 +57,23 @@ func hydrateStructFields(ctx context.Context, storage SecretStorage, config refl
 		}
 
 		if field.Kind() == reflect.Struct {
-			err := hydrateStructFields(ctx, storage, field)
-			if err != nil {
-				return fmt.Errorf("failed to process config: %w", err)
-			}
+			hydrateStructFields(ctx, storage, field, wg, errCh)
 			continue
 		}
 
-		if field.Kind() == reflect.String && field.CanSet() && strings.Contains(field.String(), "SECRET") {
-			secretName, found := strings.CutPrefix(field.String(), "SECRET:")
-			if !found {
-				return fmt.Errorf("invalid config format: %s", field.String())
-			}
+		if field.Kind() == reflect.String && field.CanSet() && strings.Contains(field.String(), "SECRET:") {
+			secretName, _ := strings.CutPrefix(field.String(), "SECRET:")
 
-			g.Go(func() error {
+			wg.Add(1)
+			go func(field reflect.Value, secretName string) {
+				defer wg.Done()
 				secretValue, err := storage.FetchSecret(ctx, secretName)
 				if err != nil {
-					return err
+					errCh <- fmt.Errorf("fetch secret failed for field %s: %w", secretName, err)
+					return
 				}
-				mux.Lock()
 				field.SetString(secretValue)
-				mux.Unlock()
-
-				return nil
-			})
+			}(field, secretName)
 		}
 	}
-	if err := g.Wait(); err != nil {
-		return err
-	}
-	return nil
 }
