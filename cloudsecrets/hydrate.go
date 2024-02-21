@@ -25,10 +25,10 @@ func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any
 		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
 	}
 
-	return processConfig(ctx, secretStorage, v)
+	return hydrateStructFields(ctx, secretStorage, v)
 }
 
-func processConfig(ctx context.Context, storage SecretStorage, config reflect.Value) error {
+func hydrateStructFields(ctx context.Context, storage SecretStorage, config reflect.Value) error {
 	g, ctx := errgroup.WithContext(ctx)
 	var mux sync.Mutex
 
@@ -45,7 +45,7 @@ func processConfig(ctx context.Context, storage SecretStorage, config reflect.Va
 
 			if field.Kind() == reflect.Struct {
 				mux.Lock()
-				err := processConfig(ctx, storage, field)
+				err := hydrateStructFields(ctx, storage, field)
 				mux.Unlock()
 				if err != nil {
 					return fmt.Errorf("failed to process config: %w", err)
