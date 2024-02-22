@@ -2,7 +2,7 @@ module github.com/0xsequence/go-cloudsecrets/_examples
 
 go 1.21.5
 
-replace github.com/0xsequence/go-cloudsecrets => ../
+//replace github.com/0xsequence/go-cloudsecrets => ../
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3
