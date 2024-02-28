@@ -5,15 +5,15 @@ go 1.21.5
 //replace github.com/0xsequence/go-cloudsecrets => ../
 
 require (
-	cloud.google.com/go/compute/metadata v0.2.3
-	cloud.google.com/go/secretmanager v1.11.5
-	github.com/0xsequence/go-cloudsecrets v0.0.0-20240216142946-05df7ca66ec5
+	github.com/0xsequence/go-cloudsecrets v0.0.0-20240222163158-89fefe72769a
 	github.com/kr/pretty v0.3.1
 )
 
 require (
 	cloud.google.com/go/compute v1.23.3 // indirect
+	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.5 // indirect
+	cloud.google.com/go/secretmanager v1.11.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

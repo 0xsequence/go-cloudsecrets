@@ -1,6 +1,24 @@
 package cloudsecrets
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
+
+type SecretStorageType string
+
+const (
+	GCP SecretStorageType = "gcp"
+)
+
+var initializeSecretStorage = func(secretStorageType SecretStorageType) (SecretStorage, error) {
+	switch secretStorageType {
+	case GCP:
+		return NewGCPSecretStorage()
+	}
+
+	return nil, fmt.Errorf("failed to initialize storage: %v", secretStorageType)
+}
 
 type SecretStorage interface {
 	// FetchSecret

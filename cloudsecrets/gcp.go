@@ -3,8 +3,10 @@ package cloudsecrets
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
+	"cloud.google.com/go/compute/metadata"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 )
@@ -14,11 +16,27 @@ type GCPSecretStorage struct {
 	client    *secretmanager.Client
 }
 
-func NewGCPSecretStorage(projectId string, client *secretmanager.Client) *GCPSecretStorage {
+func NewGCPSecretStorage() (*GCPSecretStorage, error) {
+	gcpClient, err := secretmanager.NewClient(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize google secret manager: %w", err)
+	}
+
+	// fetch a projectId depends if you running project locally vs GKE
+	var projectId string
+	if metadata.OnGCE() {
+		projectId, err = metadata.ProjectID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get project ID from metadata: %w", err)
+		}
+	} else {
+		projectId = os.Getenv("GOOGLE_CLOUD_PROJECT")
+	}
+
 	return &GCPSecretStorage{
 		projectId: projectId,
-		client:    client,
-	}
+		client:    gcpClient,
+	}, nil
 }
 
 func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string) (string, error) {
