@@ -8,7 +8,12 @@ import (
 	"sync"
 )
 
-func HydrateSecrets(ctx context.Context, secretStorage SecretStorage, config any) error {
+func HydrateSecrets(ctx context.Context, secretStorageType SecretStorageType, config any) error {
+	secretStorage, err := initializeSecretStorage(secretStorageType)
+	if err != nil {
+		return fmt.Errorf("failed to initialize storage: %w", err)
+	}
+
 	configValue := reflect.ValueOf(config)
 
 	if configValue.Kind() == reflect.Ptr {

@@ -27,12 +27,15 @@ type analytics struct {
 
 func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
 	input := "hello"
-	storage := NewMockSecretStorage(map[string]string{
-		"dbPassword":        "changethissecret",
-		"analyticsPassword": "AuthTokenSecret",
-	})
 
-	assert.Error(t, HydrateSecrets(context.Background(), storage, input))
+	initializeSecretStorage = func(secretStorageType SecretStorageType) (SecretStorage, error) {
+		return NewMockSecretStorage(map[string]string{
+			"dbPassword":        "changethissecret",
+			"analyticsPassword": "AuthTokenSecret",
+		}), nil
+	}
+
+	assert.Error(t, HydrateSecrets(context.Background(), "mock", input))
 }
 
 func TestReplacePlaceholdersWithSecrets(t *testing.T) {
@@ -40,18 +43,18 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		storage  SecretStorage
+		storage  map[string]string
 		conf     *config
 		wantErr  bool
 		wantConf *config
 	}{
 		{
 			name: "successful replacement",
-			storage: NewMockSecretStorage(map[string]string{
+			storage: map[string]string{
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
 				"pass":              "secret",
-			}),
+			},
 			conf: &config{
 				Pass: "SECRET:pass",
 				DB: db{
@@ -82,7 +85,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 		},
 		{
 			name:    "failed secret lookup",
-			storage: NewMockSecretStorage(map[string]string{}), // empty storage, or with invalid keys
+			storage: map[string]string{}, // empty storage, or with invalid keys
 			conf: &config{
 				DB: db{
 					Host:     "localhost:9090",
@@ -104,7 +107,10 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := HydrateSecrets(ctx, tt.storage, tt.conf)
+			initializeSecretStorage = func(secretStorageType SecretStorageType) (SecretStorage, error) {
+				return NewMockSecretStorage(tt.storage), nil
+			}
+			err := HydrateSecrets(ctx, "mock", tt.conf)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
