@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"cloud.google.com/go/compute/metadata"
@@ -12,30 +14,36 @@ import (
 )
 
 type GCPSecretStorage struct {
-	projectId string
-	client    *secretmanager.Client
+	projectNumber string
+	client        *secretmanager.Client
 }
 
 func NewGCPSecretStorage() (*GCPSecretStorage, error) {
 	gcpClient, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize google secret manager: %w", err)
+		return nil, fmt.Errorf("initializing GCP secret manager: %w", err)
 	}
+	// TODO: gcpClient.Close()
 
-	// fetch a projectId depends if you running project locally vs GKE
-	var projectId string
+	var projectNumber string
 	if metadata.OnGCE() {
-		projectId, err = metadata.ProjectID()
+		projectNumber, err = metadata.NumericProjectID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get project ID from metadata: %w", err)
+			return nil, fmt.Errorf("getting project ID from metadata: %w", err)
 		}
 	} else {
-		projectId = os.Getenv("GOOGLE_CLOUD_PROJECT")
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		projectNumber, err = getProjectNumberFromGcloud(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting project ID from gcloud: %w", err)
+		}
 	}
 
 	return &GCPSecretStorage{
-		projectId: projectId,
-		client:    gcpClient,
+		projectNumber: projectNumber,
+		client:        gcpClient,
 	}, nil
 }
 
@@ -43,7 +51,7 @@ func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string
 	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
-		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", storage.projectId, secretId, versionId),
+		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", storage.projectNumber, secretId, versionId),
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -57,4 +65,26 @@ func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string
 
 	// Return the secret value
 	return string(result.Payload.Data), nil
+}
+
+func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
+	// Inferring ProjectId using
+	// creds, err := google.FindDefaultCredentials(ctx, "")
+	// doesn't work. See https://github.com/golang/oauth2/issues/241.
+
+	projectId := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectId == "" {
+		out, err := exec.CommandContext(ctx, "gcloud", "config", "get-value", "project").Output()
+		if err != nil {
+			return "", fmt.Errorf("getting current gcloud project (try `gcloud auth application-default login'): %w", err)
+		}
+		projectId = strings.TrimSpace(string(out))
+	}
+
+	// We need projectNumber (not projectName!) for GCP Secret Manager APIs.
+	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output()
+	if err != nil {
+		return "", fmt.Errorf("getting projectNumber from projectId %q: %w", projectId, err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
