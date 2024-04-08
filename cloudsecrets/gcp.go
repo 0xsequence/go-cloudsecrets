@@ -32,7 +32,7 @@ func NewGCPSecretStorage() (*GCPSecretStorage, error) {
 			return nil, fmt.Errorf("getting project ID from metadata: %w", err)
 		}
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
 		projectNumber, err = getProjectNumberFromGcloud(ctx)

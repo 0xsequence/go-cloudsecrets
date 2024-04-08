@@ -9,7 +9,7 @@ type MockSecretStorage struct {
 	secrets map[string]string
 }
 
-func NewMockSecretStorage(secrets map[string]string) *MockSecretStorage {
+func NewMockSecretProvider(secrets map[string]string) *MockSecretStorage {
 	return &MockSecretStorage{secrets: secrets}
 }
 

@@ -10,20 +10,19 @@ import (
 	"github.com/kr/pretty"
 )
 
-var cfg = &config.Config{
-	DB: &config.DB{
-		Database: "postgres",
-		Host:     "localhost:5432",
-		Username: "sequence",
-		Password: "SECRET:apiDbPassword",
-	},
-}
-
 func main() {
-	// cfg = application config can be any struct
-	err := cloudsecrets.HydrateSecrets(context.Background(), cloudsecrets.GCP, cfg)
+	var cfg = &config.Config{
+		DB: &config.DB{
+			Database: "db_name",
+			Host:     "localhost:5432",
+			Username: "SECRET:dbUsername",
+			Password: "SECRET:dbPassword",
+		},
+	}
+
+	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
 	if err != nil {
-		log.Fatal("failed to replace secret placeholders with real values: ", err)
+		log.Fatal("failed to hydrate secrets: ", err)
 	}
 
 	fmt.Printf("%# v", pretty.Formatter(cfg))

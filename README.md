@@ -1,21 +1,37 @@
 # go-cloudsecrets
-- Package to hydrate secrets from GCP Secret Manager
-- Find and replace string values starting with SECRET: prefix with the value fetched from GCP Secret Manager.
 
-Example: 
+Go package to hydrate runtime secrets from Cloud providers
+- [x] GCP Secret Manager
+- [ ] AWS Secrets Manager
+
+```go
+cloudsecrets.Hydrate(ctx, "gcp", &Config{})
 ```
-# app.conf
-[db]
-database = "dbname"
-host     = "dbhost"
-username = "dbuser"
-password = "SECRET:db_password" # reference to db_password secret in GCP project
-```
+
+`Hydrate()` recursively walks given struct (pointer) and for any field matching `SECRET:`
+string prefix, it will fetch secret from secret provider and replace the original value:
+- `"SECRET:{secretName}"` => `provider.fetchSecret("secretName", "latest")`
+
 
 ## Usage
-```
-err = cloudsecrets.HydrateSecrets(context.Background(), "gcp", cfg)
-if err != nil {
-    return nil, fmt.Errorf("failed to replace secret placeholders with real values: %w", err)
+```go
+import "github.com/0xsequence/go-cloudsecrets/cloudsecrets"
+
+func main() {
+    var cfg := &config.Config{
+    	DB: &config.DB{
+    		Database: "postgres",
+    		Host:     "localhost:5432",
+    		Username: "sequence",
+    		Password: "SECRET:dbPassword", // to be hydrated
+        },
+    }
+
+	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
+	if err != nil {
+		log.Fatal("failed to hydrate secrets: ", err)
+	}
+
+    // cfg.DB.Password now contains value of "dbPassword" GCP secret (latest version)
 }
 ```

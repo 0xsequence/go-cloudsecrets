@@ -2,6 +2,7 @@ package cloudsecrets
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,14 +29,13 @@ type analytics struct {
 func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
 	input := "hello"
 
-	initializeSecretStorage = func(secretStorageType SecretStorageType) (SecretStorage, error) {
-		return NewMockSecretStorage(map[string]string{
-			"dbPassword":        "changethissecret",
-			"analyticsPassword": "AuthTokenSecret",
-		}), nil
-	}
+	v := reflect.ValueOf(input)
+	provider := NewMockSecretProvider(map[string]string{
+		"dbPassword":        "changethissecret",
+		"analyticsPassword": "AuthTokenSecret",
+	})
 
-	assert.Error(t, HydrateSecrets(context.Background(), "mock", input))
+	assert.Error(t, hydrateStruct(context.Background(), provider, v))
 }
 
 func TestReplacePlaceholdersWithSecrets(t *testing.T) {
@@ -107,10 +107,8 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			initializeSecretStorage = func(secretStorageType SecretStorageType) (SecretStorage, error) {
-				return NewMockSecretStorage(tt.storage), nil
-			}
-			err := HydrateSecrets(ctx, "mock", tt.conf)
+			v := reflect.ValueOf(tt.conf)
+			err := hydrateStruct(ctx, NewMockSecretProvider(tt.storage), v)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
