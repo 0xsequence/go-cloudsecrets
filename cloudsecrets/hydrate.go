@@ -9,7 +9,7 @@ import (
 )
 
 // Hydrate hydrates "obj" secrets from a given Cloud secrets provider.
-// Values are hydrated if they start with "SECRET:" prefix following the name/path of the secret.
+// Values are hydrated if they start with "$SECRET:" prefix following the name/path of the secret.
 //
 // Currently, only a pointer to struct is supported as an obj.
 func Hydrate(ctx context.Context, cloudProvider string, obj interface{}) error {
@@ -85,7 +85,7 @@ func hydrateStructFields(ctx context.Context, provider secretsProvider, config r
 		}
 
 		if field.Kind() == reflect.String && field.CanSet() {
-			secretName, found := strings.CutPrefix(field.String(), "SECRET:")
+			secretName, found := strings.CutPrefix(field.String(), "$SECRET:")
 			if found {
 				wg.Add(1)
 				go func(field reflect.Value, secretName string) {

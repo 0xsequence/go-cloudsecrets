@@ -56,16 +56,16 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				"pass":              "secret",
 			},
 			conf: &config{
-				Pass: "SECRET:pass",
+				Pass: "$SECRET:pass",
 				DB: db{
 					Host:     "localhost:9090",
 					Username: "postgres",
-					Password: "SECRET:dbPassword",
+					Password: "$SECRET:dbPassword",
 				},
 				Analytics: analytics{
 					Enabled:   true,
 					Server:    "http://localhost:8000",
-					AuthToken: "SECRET:analyticsPassword",
+					AuthToken: "$SECRET:analyticsPassword",
 				},
 			},
 			wantErr: false,
@@ -90,7 +90,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				DB: db{
 					Host:     "localhost:9090",
 					Username: "postgres",
-					Password: "SECRET:dbPassword",
+					Password: "$SECRET:dbPassword",
 				},
 			},
 			wantErr: true,
@@ -99,7 +99,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				DB: db{
 					Host:     "localhost:9090",
 					Username: "postgres",
-					Password: "SECRET:dbPassword",
+					Password: "$SECRET:dbPassword",
 				},
 			},
 		},
