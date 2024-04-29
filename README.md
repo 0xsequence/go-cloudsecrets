@@ -8,9 +8,9 @@ Go package to hydrate runtime secrets from Cloud providers
 cloudsecrets.Hydrate(ctx, "gcp", &Config{})
 ```
 
-`Hydrate()` recursively walks given struct (pointer) and for any field matching `SECRET:`
+`Hydrate()` recursively walks given struct (pointer) and for any field matching `$SECRET:`
 string prefix, it will fetch secret from secret provider and replace the original value:
-- `"SECRET:{secretName}"` => `provider.fetchSecret("secretName", "latest")`
+- `"$SECRET:{secretName}"` => `provider.fetchSecret("secretName", "latest")`
 
 
 ## Usage
@@ -23,7 +23,7 @@ func main() {
     		Database: "postgres",
     		Host:     "localhost:5432",
     		Username: "sequence",
-    		Password: "SECRET:dbPassword", // to be hydrated
+    		Password: "$SECRET:dbPassword", // to be hydrated
         },
     }
 

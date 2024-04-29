@@ -15,8 +15,8 @@ func main() {
 		DB: &config.DB{
 			Database: "db_name",
 			Host:     "localhost:5432",
-			Username: "SECRET:dbUsername",
-			Password: "SECRET:dbPassword",
+			Username: "$SECRET:dbUsername",
+			Password: "$SECRET:dbPassword",
 		},
 	}
 
