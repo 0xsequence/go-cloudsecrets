@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/0xsequence/go-cloudsecrets/gcp"
 )
 
 // Hydrate hydrates "obj" secrets from a given Cloud secrets provider.
@@ -19,8 +21,11 @@ func Hydrate(ctx context.Context, cloudProvider string, obj interface{}) error {
 	)
 
 	switch cloudProvider {
+	case "":
+		return nil
+
 	case "gcp":
-		provider, err = NewGCPSecretStorage()
+		provider, err = gcp.NewSecretProvider()
 		if err != nil {
 			return fmt.Errorf("failed to init gcp secret store: %w", err)
 		}

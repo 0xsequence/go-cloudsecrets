@@ -1,4 +1,4 @@
-package cloudsecrets
+package gcp
 
 import (
 	"context"
@@ -13,17 +13,16 @@ import (
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 )
 
-type GCPSecretStorage struct {
+type SecretProvider struct {
 	projectNumber string
 	client        *secretmanager.Client
 }
 
-func NewGCPSecretStorage() (*GCPSecretStorage, error) {
+func NewSecretProvider() (*SecretProvider, error) {
 	gcpClient, err := secretmanager.NewClient(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("initializing GCP secret manager: %w", err)
 	}
-	// TODO: gcpClient.Close()
 
 	var projectNumber string
 	if metadata.OnGCE() {
@@ -41,13 +40,13 @@ func NewGCPSecretStorage() (*GCPSecretStorage, error) {
 		}
 	}
 
-	return &GCPSecretStorage{
+	return &SecretProvider{
 		projectNumber: projectNumber,
 		client:        gcpClient,
 	}, nil
 }
 
-func (storage GCPSecretStorage) FetchSecret(ctx context.Context, secretId string) (string, error) {
+func (storage SecretProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
