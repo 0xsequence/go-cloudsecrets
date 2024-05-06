@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/0xsequence/go-cloudsecrets"
 	"github.com/0xsequence/go-cloudsecrets/_examples/config"
-	"github.com/0xsequence/go-cloudsecrets/cloudsecrets"
 	"github.com/kr/pretty"
 )
 
