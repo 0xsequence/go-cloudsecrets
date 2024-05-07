@@ -31,7 +31,7 @@ func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
 	input := "hello"
 
 	v := reflect.ValueOf(input)
-	provider := mock.NewSecretProvider(map[string]string{
+	provider := mock.NewSecretsProvider(map[string]string{
 		"dbPassword":        "changethissecret",
 		"analyticsPassword": "AuthTokenSecret",
 	})
@@ -109,7 +109,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.conf)
-			err := hydrateStruct(ctx, mock.NewSecretProvider(tt.storage), v)
+			err := hydrateStruct(ctx, mock.NewSecretsProvider(tt.storage), v)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)

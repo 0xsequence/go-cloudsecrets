@@ -22,7 +22,7 @@ func main() {
 
 	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
 	if err != nil {
-		log.Fatal("failed to hydrate secrets: ", err)
+		log.Fatal("failed to hydrate config secrets:", err)
 	}
 
 	fmt.Printf("%# v", pretty.Formatter(cfg))

@@ -5,18 +5,18 @@ import (
 	"fmt"
 )
 
-type SecretProvider struct {
+type SecretsProvider struct {
 	secrets map[string]string
 }
 
-func NewSecretProvider(secrets map[string]string) *SecretProvider {
-	return &SecretProvider{secrets: secrets}
+func NewSecretsProvider(secrets map[string]string) *SecretsProvider {
+	return &SecretsProvider{secrets: secrets}
 }
 
-func (p SecretProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
+func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	secret, ok := p.secrets[secretId]
 	if !ok {
-		return "", fmt.Errorf("failed to find secret %q", secretId)
+		return "", fmt.Errorf("find secret %q", secretId)
 	}
 
 	return secret, nil
