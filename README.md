@@ -1,8 +1,8 @@
 # go-cloudsecrets
 
 Go package to hydrate runtime secrets from Cloud providers
-- [x] GCP Secret Manager
-- [ ] AWS Secrets Manager
+- [x] `"gcp"`, GCP Secret Manager
+- [ ] `"aws"`, AWS Secrets Manager
 
 ```go
 cloudsecrets.Hydrate(ctx, "gcp", &Config{})
