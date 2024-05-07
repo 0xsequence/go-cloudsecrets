@@ -46,20 +46,20 @@ func NewSecretsProvider() (*SecretsProvider, error) {
 	}, nil
 }
 
-func (storage SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
+func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
-		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", storage.projectNumber, secretId, versionId),
+		Name: fmt.Sprintf("projects/%s/secrets/%s/versions/%s", p.projectNumber, secretId, versionId),
 	}
 
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	// Access the secret version
-	result, err := storage.client.AccessSecretVersion(reqCtx, req)
+	result, err := p.client.AccessSecretVersion(reqCtx, req)
 	if err != nil {
-		return "", fmt.Errorf("accessing secret %s: %w", secretId, err)
+		return "", fmt.Errorf("fetching GCP secret %q: %w", secretId, err)
 	}
 
 	// Return the secret value
@@ -83,7 +83,7 @@ func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
 	// We need projectNumber (not projectName!) for GCP Secret Manager APIs.
 	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output()
 	if err != nil {
-		return "", fmt.Errorf("getting projectNumber from projectId %q: %w", projectId, err)
+		return "", fmt.Errorf("getting gcloud projectNumber from projectId %q: %w", projectId, err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }

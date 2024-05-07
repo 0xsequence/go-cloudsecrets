@@ -29,7 +29,7 @@ func main() {
 
 	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
 	if err != nil {
-		log.Fatal("failed to hydrate config secrets: ", err)
+		log.Fatalf("failed to hydrate config secrets: %v", err)
 	}
 
 	// cfg.DB.Password now contains value of "dbPassword" GCP secret (latest version)

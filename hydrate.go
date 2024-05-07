@@ -31,7 +31,7 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 	case "gcp":
 		provider, err = gcp.NewSecretsProvider()
 		if err != nil {
-			return fmt.Errorf("init gcp secret store: %w", err)
+			return fmt.Errorf("creating gcp secret provider: %w", err)
 		}
 
 	default:
@@ -69,7 +69,7 @@ func hydrateStruct(ctx context.Context, provider secretsProvider, v reflect.Valu
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("failed to process config: %w", err)
+			return fmt.Errorf("walking struct fields: %w", err)
 		}
 	}
 
@@ -97,15 +97,15 @@ func hydrateStructFields(ctx context.Context, provider secretsProvider, config r
 			secretName, found := strings.CutPrefix(field.String(), "$SECRET:")
 			if found {
 				wg.Add(1)
-				go func(field reflect.Value, secretName string) {
+				go func(fieldName string, field reflect.Value, secretName string) {
 					defer wg.Done()
 					secretValue, err := provider.FetchSecret(ctx, secretName)
 					if err != nil {
-						errCh <- fmt.Errorf("fetch secret failed for field %s: %w", secretName, err)
+						errCh <- fmt.Errorf("%v=%q: %w", fieldName, field.String(), err)
 						return
 					}
 					field.SetString(secretValue)
-				}(field, secretName)
+				}(config.Type().Field(i).Name, field, secretName)
 			}
 		}
 	}
