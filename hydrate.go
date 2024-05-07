@@ -6,30 +6,39 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	"github.com/0xsequence/go-cloudsecrets/gcp"
+	"github.com/0xsequence/go-cloudsecrets/nosecrets"
 )
 
-// Hydrate hydrates "obj" secrets from a given Cloud secrets provider.
-// Values are hydrated if they start with "$SECRET:" prefix following the name/path of the secret.
+// Hydrate recursively walks a given config (struct pointer) and hydrates all
+// string values matching "$SECRET:" prefix using a given Cloud secrets provider.
 //
-// Currently, only a pointer to struct is supported as an obj.
-func Hydrate(ctx context.Context, cloudProvider string, obj interface{}) error {
-	var (
-		err      error
-		provider secretsProvider
-	)
+// The secret values to be replaced must have a format of "$SECRET:{name|path}".
+//
+// Supported providers:
+// - "gcp": Google Cloud Secret Manager
+// - "":    If no provider is given, walk the config and fail on any "$SECRET:".
+func Hydrate(ctx context.Context, providerName string, config interface{}) error {
+	var err error
+	var provider secretsProvider
 
-	switch cloudProvider {
+	switch providerName {
+	case "":
+		// No provider configured. If we see a $SECRET: value, we fail.
+		provider = nosecrets.NewSecretsProvider()
+
 	case "gcp":
-		provider, err = NewGCPSecretStorage()
+		provider, err = gcp.NewSecretsProvider()
 		if err != nil {
-			return fmt.Errorf("failed to init gcp secret store: %w", err)
+			return fmt.Errorf("creating gcp secret provider: %w", err)
 		}
 
 	default:
-		return fmt.Errorf("unsupported provider %q", cloudProvider)
+		return fmt.Errorf("unsupported provider %q", providerName)
 	}
 
-	v := reflect.ValueOf(obj)
+	v := reflect.ValueOf(config)
 	return hydrateStruct(ctx, provider, v)
 }
 
@@ -60,7 +69,7 @@ func hydrateStruct(ctx context.Context, provider secretsProvider, v reflect.Valu
 			return nil
 		}
 		if err != nil {
-			return fmt.Errorf("failed to process config: %w", err)
+			return fmt.Errorf("walking struct fields: %w", err)
 		}
 	}
 
@@ -88,15 +97,15 @@ func hydrateStructFields(ctx context.Context, provider secretsProvider, config r
 			secretName, found := strings.CutPrefix(field.String(), "$SECRET:")
 			if found {
 				wg.Add(1)
-				go func(field reflect.Value, secretName string) {
+				go func(fieldName string, field reflect.Value, secretName string) {
 					defer wg.Done()
 					secretValue, err := provider.FetchSecret(ctx, secretName)
 					if err != nil {
-						errCh <- fmt.Errorf("fetch secret failed for field %s: %w", secretName, err)
+						errCh <- fmt.Errorf("%v=%q: %w", fieldName, field.String(), err)
 						return
 					}
 					field.SetString(secretValue)
-				}(field, secretName)
+				}(config.Type().Field(i).Name, field, secretName)
 			}
 		}
 	}

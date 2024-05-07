@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/0xsequence/go-cloudsecrets"
 	"github.com/0xsequence/go-cloudsecrets/_examples/config"
-	"github.com/0xsequence/go-cloudsecrets/cloudsecrets"
 	"github.com/kr/pretty"
 )
 
@@ -22,7 +22,7 @@ func main() {
 
 	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
 	if err != nil {
-		log.Fatal("failed to hydrate secrets: ", err)
+		log.Fatalf("failed to hydrate config secrets: %v", err)
 	}
 
 	fmt.Printf("%# v", pretty.Formatter(cfg))
