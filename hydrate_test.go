@@ -10,9 +10,10 @@ import (
 )
 
 type config struct {
-	DB        db
-	Analytics analytics
-	Pass      string
+	DB         db
+	Analytics  analytics
+	Pass       string
+	JWTSecrets []string
 }
 
 type db struct {
@@ -55,6 +56,8 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
 				"pass":              "secret",
+				"jwtSecretV1":       "some-old-secret",
+				"jwtSecretV2":       "changeme-now",
 			},
 			conf: &config{
 				Pass: "$SECRET:pass",
@@ -68,6 +71,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					Server:    "http://localhost:8000",
 					AuthToken: "$SECRET:analyticsPassword",
 				},
+				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
 			},
 			wantErr: false,
 			wantConf: &config{
@@ -81,6 +85,10 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					Enabled:   true,
 					Server:    "http://localhost:8000",
 					AuthToken: "AuthTokenSecret",
+				},
+				JWTSecrets: []string{
+					"changeme-now",
+					"some-old-secret",
 				},
 			},
 		},
