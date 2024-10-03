@@ -80,20 +80,23 @@ func hydrateStructFields(ctx context.Context, provider secretsProvider, config r
 	for i := 0; i < config.NumField(); i++ {
 		field := config.Field(i)
 
-		if field.Kind() == reflect.Ptr {
+		switch field.Kind() {
+		case reflect.Ptr:
 			if field.IsNil() {
 				continue
 			}
 			// Dereference pointer
 			field = field.Elem()
-		}
 
-		if field.Kind() == reflect.Struct {
+		case reflect.Struct:
 			hydrateStructFields(ctx, provider, field, wg, errCh)
 			continue
-		}
 
-		if field.Kind() == reflect.String && field.CanSet() {
+		case reflect.String:
+			if !field.CanSet() {
+				continue
+			}
+
 			secretName, found := strings.CutPrefix(field.String(), "$SECRET:")
 			if found {
 				wg.Add(1)
