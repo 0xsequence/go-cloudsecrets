@@ -35,6 +35,12 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
 		}
 
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			item := v.Index(i)
+			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
+		}
+
 	case reflect.String:
 		secretName, found := strings.CutPrefix(v.String(), "$SECRET:")
 		if !found {
@@ -51,7 +57,8 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 			fieldPath:  path,
 			secretName: secretName,
 		})
-	}
 
-	return
+	default:
+		return
+	}
 }
