@@ -53,13 +53,11 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
 	}
 
-	ga := &collector{}
-	ga.collectSecretFields(v, "config")
-
-	fields := ga.fields
+	c := &collector{}
+	c.collectSecretFields(v, "config")
 
 	g := &errgroup.Group{}
-	for _, field := range fields {
+	for _, field := range c.fields {
 		field := field
 
 		g.Go(func() error {
