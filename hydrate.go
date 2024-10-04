@@ -7,7 +7,6 @@ import (
 
 	"github.com/0xsequence/go-cloudsecrets/gcp"
 	"github.com/0xsequence/go-cloudsecrets/nosecrets"
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -55,11 +54,9 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 	}
 
 	ga := &collector{}
-	ga.collectSecretFields(v, "")
+	ga.collectSecretFields(v, "config")
 
 	fields := ga.fields
-
-	spew.Dump(fields)
 
 	g := &errgroup.Group{}
 	for _, field := range fields {

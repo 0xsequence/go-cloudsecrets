@@ -31,13 +31,7 @@ type analytics struct {
 func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
 	input := "hello"
 
-	v := reflect.ValueOf(input)
-	provider := mock.NewSecretsProvider(map[string]string{
-		"dbPassword":        "changethissecret",
-		"analyticsPassword": "AuthTokenSecret",
-	})
-
-	assert.Error(t, hydrateStruct(context.Background(), provider, v))
+	assert.Error(t, Hydrate(context.Background(), "", input))
 }
 
 func TestReplacePlaceholdersWithSecrets(t *testing.T) {
@@ -117,7 +111,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.conf)
-			err := hydrateStruct(ctx, mock.NewSecretsProvider(tt.storage), v)
+			err := hydrateConfig(ctx, mock.NewSecretsProvider(tt.storage), v)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
