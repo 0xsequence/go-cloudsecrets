@@ -10,9 +10,10 @@ import (
 )
 
 type config struct {
-	DB        db
-	Analytics analytics
-	Pass      string
+	DB         db
+	Analytics  analytics
+	Pass       string
+	JWTSecrets []string
 }
 
 type db struct {
@@ -30,13 +31,7 @@ type analytics struct {
 func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
 	input := "hello"
 
-	v := reflect.ValueOf(input)
-	provider := mock.NewSecretsProvider(map[string]string{
-		"dbPassword":        "changethissecret",
-		"analyticsPassword": "AuthTokenSecret",
-	})
-
-	assert.Error(t, hydrateStruct(context.Background(), provider, v))
+	assert.Error(t, Hydrate(context.Background(), "", input))
 }
 
 func TestReplacePlaceholdersWithSecrets(t *testing.T) {
@@ -55,6 +50,8 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
 				"pass":              "secret",
+				"jwtSecretV1":       "some-old-secret",
+				"jwtSecretV2":       "changeme-now",
 			},
 			conf: &config{
 				Pass: "$SECRET:pass",
@@ -68,6 +65,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					Server:    "http://localhost:8000",
 					AuthToken: "$SECRET:analyticsPassword",
 				},
+				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
 			},
 			wantErr: false,
 			wantConf: &config{
@@ -81,6 +79,10 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					Enabled:   true,
 					Server:    "http://localhost:8000",
 					AuthToken: "AuthTokenSecret",
+				},
+				JWTSecrets: []string{
+					"changeme-now",
+					"some-old-secret",
 				},
 			},
 		},
@@ -109,7 +111,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			v := reflect.ValueOf(tt.conf)
-			err := hydrateStruct(ctx, mock.NewSecretsProvider(tt.storage), v)
+			err := hydrateConfig(ctx, mock.NewSecretsProvider(tt.storage), v)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
