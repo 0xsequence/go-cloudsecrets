@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
-	"sync"
 
 	"github.com/0xsequence/go-cloudsecrets/gcp"
 	"github.com/0xsequence/go-cloudsecrets/nosecrets"
+	"github.com/davecgh/go-spew/spew"
+	"golang.org/x/sync/errgroup"
 )
 
 // Hydrate recursively walks a given config (struct pointer) and hydrates all
@@ -39,15 +39,14 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 	}
 
 	v := reflect.ValueOf(config)
-	return hydrateStruct(ctx, provider, v)
+	return hydrateConfig(ctx, provider, v)
 }
 
-func hydrateStruct(ctx context.Context, provider secretsProvider, v reflect.Value) error {
+func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Value) error {
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
 			return fmt.Errorf("passed config is nil")
 		}
-
 		v = v.Elem()
 	}
 
@@ -55,61 +54,27 @@ func hydrateStruct(ctx context.Context, provider secretsProvider, v reflect.Valu
 		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
 	}
 
-	errCh := make(chan error)
-	wg := &sync.WaitGroup{}
-	hydrateStructFields(ctx, provider, v, wg, errCh)
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
+	ga := &collector{}
+	ga.collectSecretFields(v, "")
 
-	select {
-	case err, ok := <-errCh:
-		if !ok {
+	fields := ga.fields
+
+	spew.Dump(fields)
+
+	g := &errgroup.Group{}
+	for _, field := range fields {
+		field := field
+
+		g.Go(func() error {
+			secretValue, err := provider.FetchSecret(ctx, field.secretName)
+			if err != nil {
+				return fmt.Errorf("failed to fetch secret %v=%q: %w", field.fieldPath, field.value.String(), err)
+			}
+			field.value.SetString(secretValue)
+
 			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("walking struct fields: %w", err)
-		}
+		})
 	}
 
-	return nil
-}
-
-func hydrateStructFields(ctx context.Context, provider secretsProvider, config reflect.Value, wg *sync.WaitGroup, errCh chan error) {
-	for i := 0; i < config.NumField(); i++ {
-		field := config.Field(i)
-
-		switch field.Kind() {
-		case reflect.Ptr:
-			if field.IsNil() {
-				continue
-			}
-			// Dereference pointer
-			field = field.Elem()
-
-		case reflect.Struct:
-			hydrateStructFields(ctx, provider, field, wg, errCh)
-			continue
-
-		case reflect.String:
-			if !field.CanSet() {
-				continue
-			}
-
-			secretName, found := strings.CutPrefix(field.String(), "$SECRET:")
-			if found {
-				wg.Add(1)
-				go func(fieldName string, field reflect.Value, secretName string) {
-					defer wg.Done()
-					secretValue, err := provider.FetchSecret(ctx, secretName)
-					if err != nil {
-						errCh <- fmt.Errorf("%v=%q: %w", fieldName, field.String(), err)
-						return
-					}
-					field.SetString(secretValue)
-				}(config.Type().Field(i).Name, field, secretName)
-			}
-		}
-	}
+	return g.Wait()
 }
