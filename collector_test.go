@@ -3,31 +3,9 @@ package cloudsecrets
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 )
-
-type config1 struct {
-	DB            dbConfig
-	DBPtr         *dbConfig
-	DBDoublePtr   **dbConfig
-	JWTSecrets    []jwtSecret
-	JWTSecretsPtr []*jwtSecret
-	Providers     map[string]providerConfig
-	ProvidersPtr  map[string]*providerConfig
-	unexported    dbConfig
-}
-
-type dbConfig struct {
-	User     string
-	Password string
-}
-
-type providerConfig struct {
-	Name   string
-	Secret string
-}
-
-type jwtSecret string
 
 func TestCollectFields(t *testing.T) {
 	tt := []struct {
@@ -38,7 +16,7 @@ func TestCollectFields(t *testing.T) {
 	}{
 		{
 			Name: "DB_config_with_no_creds",
-			Input: &config1{
+			Input: &cfg{
 				DB: dbConfig{
 					User:     "db-user",
 					Password: "db-password",
@@ -56,7 +34,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "DB_config_with_creds",
-			Input: &config1{
+			Input: &cfg{
 				DB: dbConfig{
 					User:     "db-user",
 					Password: "$SECRET:db-password",
@@ -66,7 +44,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "DB config ptr with creds",
-			Input: &config1{
+			Input: &cfg{
 				DBPtr: &dbConfig{
 					User:     "db-user",
 					Password: "$SECRET:db-password",
@@ -76,7 +54,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "DB_config_double_ptr_with_creds",
-			Input: &config1{
+			Input: &cfg{
 				DBDoublePtr: ptr(&dbConfig{
 					User:     "db-user",
 					Password: "$SECRET:db-password",
@@ -86,7 +64,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "Slice_of_secret_values",
-			Input: &config1{
+			Input: &cfg{
 				DB: dbConfig{
 					User:     "db-user",
 					Password: "$SECRET:secretName",
@@ -97,7 +75,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "Slice_of_secret_pointer_values",
-			Input: &config1{
+			Input: &cfg{
 				DB: dbConfig{
 					User:     "db-user",
 					Password: "$SECRET:secretName",
@@ -108,7 +86,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "Map_with_values",
-			Input: &config1{
+			Input: &cfg{
 				Providers: map[string]providerConfig{
 					"provider1": {Name: "provider1", Secret: "$SECRET:secretProvider1"},
 					"provider2": {Name: "provider2", Secret: "$SECRET:secretProvider2"},
@@ -119,7 +97,7 @@ func TestCollectFields(t *testing.T) {
 		},
 		{
 			Name: "Map_with_ptr_values",
-			Input: &config1{
+			Input: &cfg{
 				ProvidersPtr: map[string]*providerConfig{
 					"provider1": {Name: "provider1", Secret: "$SECRET:secretProvider1"},
 					"provider2": {Name: "provider2", Secret: "$SECRET:secretProvider2"},
@@ -129,8 +107,8 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"secretProvider1", "secretProvider2", "secretProvider3"},
 		},
 		{
-			Name: "Unexported_field_should_fail_to)hydrate",
-			Input: &config1{
+			Name: "Unexported_field_should_fail_to_hydrate",
+			Input: &cfg{
 				unexported: dbConfig{ // unexported fields can't be updated via reflect pkg
 					User:     "db-user",
 					Password: "$SECRET:secretName", // match inside unexported field
@@ -152,23 +130,54 @@ func TestCollectFields(t *testing.T) {
 			if tc.Error {
 				if c.err == nil {
 					t.Error("expected error, got nil")
+					return
 				}
 			} else {
 				if c.err != nil {
 					t.Errorf("unexpected error: %v", c.err)
+					return
 				}
 			}
 
 			if len(c.fields) != len(tc.Out) {
 				t.Errorf("expected %v secrets, got %v", len(tc.Out), len(c.fields))
 			}
-			for i := 0; i < len(c.fields); i++ {
-				if c.fields[i].secretName != tc.Out[i] {
-					t.Errorf("collected field[%v].secretName=%v doesn't match tc.Out[%v]=%v", i, c.fields[i].secretName, i, tc.Out[i])
+
+			fields := c.fields
+			sort.Slice(fields, func(i, j int) bool {
+				return fields[i].fieldPath <= fields[j].fieldPath
+			})
+
+			for i := 0; i < len(fields); i++ {
+				if fields[i].secretName != tc.Out[i] {
+					t.Errorf("collected field[%v].secretName=%v doesn't match tc.Out[%v]=%v", i, fields[i].secretName, i, tc.Out[i])
 				}
 			}
 		})
 	}
 }
+
+type cfg struct {
+	DB            dbConfig
+	DBPtr         *dbConfig
+	DBDoublePtr   **dbConfig
+	JWTSecrets    []jwtSecret
+	JWTSecretsPtr []*jwtSecret
+	Providers     map[string]providerConfig
+	ProvidersPtr  map[string]*providerConfig
+	unexported    dbConfig
+}
+
+type dbConfig struct {
+	User     string
+	Password string
+}
+
+type providerConfig struct {
+	Name   string
+	Secret string
+}
+
+type jwtSecret string
 
 func ptr[T any](v T) *T { return &v }
