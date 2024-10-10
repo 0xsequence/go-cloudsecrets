@@ -7,11 +7,14 @@ import (
 )
 
 type config1 struct {
-	DB         dbConfig
-	JWTSecrets []jwtSecret
-	Providers  map[string]*providerConfig
-	DoublePtr  **providerConfig
-	unexported dbConfig
+	DB            dbConfig
+	DBPtr         *dbConfig
+	DBDoublePtr   **dbConfig
+	JWTSecrets    []jwtSecret
+	JWTSecretsPtr []*jwtSecret
+	Providers     map[string]providerConfig
+	ProvidersPtr  map[string]*providerConfig
+	unexported    dbConfig
 }
 
 type dbConfig struct {
@@ -34,17 +37,25 @@ func TestCollectFields(t *testing.T) {
 		Error bool
 	}{
 		{
-			Name: "Basic DB config with no creds",
+			Name: "DB_config_with_no_creds",
 			Input: &config1{
 				DB: dbConfig{
 					User:     "db-user",
 					Password: "db-password",
 				},
+				DBPtr: &dbConfig{
+					User:     "db-user",
+					Password: "db-password",
+				},
+				DBDoublePtr: ptr(&dbConfig{
+					User:     "db-user",
+					Password: "db-password",
+				}),
 			},
 			Out: []string{},
 		},
 		{
-			Name: "Basic DB config with creds",
+			Name: "DB_config_with_creds",
 			Input: &config1{
 				DB: dbConfig{
 					User:     "db-user",
@@ -54,7 +65,27 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"db-password"},
 		},
 		{
-			Name: "Slice of secrets",
+			Name: "DB config ptr with creds",
+			Input: &config1{
+				DBPtr: &dbConfig{
+					User:     "db-user",
+					Password: "$SECRET:db-password",
+				},
+			},
+			Out: []string{"db-password"},
+		},
+		{
+			Name: "DB_config_double_ptr_with_creds",
+			Input: &config1{
+				DBDoublePtr: ptr(&dbConfig{
+					User:     "db-user",
+					Password: "$SECRET:db-password",
+				}),
+			},
+			Out: []string{"db-password"},
+		},
+		{
+			Name: "Slice_of_secret_values",
 			Input: &config1{
 				DB: dbConfig{
 					User:     "db-user",
@@ -65,9 +96,20 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
 		},
 		{
-			Name: "Map with secrets",
+			Name: "Slice_of_secret_pointer_values",
 			Input: &config1{
-				Providers: map[string]*providerConfig{
+				DB: dbConfig{
+					User:     "db-user",
+					Password: "$SECRET:secretName",
+				},
+				JWTSecretsPtr: []*jwtSecret{ptr(jwtSecret("$SECRET:jwtSecret1")), ptr(jwtSecret("$SECRET:jwtSecret2")), ptr(jwtSecret("nope"))},
+			},
+			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
+		},
+		{
+			Name: "Map_with_values",
+			Input: &config1{
+				Providers: map[string]providerConfig{
 					"provider1": {Name: "provider1", Secret: "$SECRET:secretProvider1"},
 					"provider2": {Name: "provider2", Secret: "$SECRET:secretProvider2"},
 					"provider3": {Name: "provider3", Secret: "$SECRET:secretProvider3"},
@@ -76,14 +118,18 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"secretProvider1", "secretProvider2", "secretProvider3"},
 		},
 		{
-			Name: "Double pointer",
+			Name: "Map_with_ptr_values",
 			Input: &config1{
-				DoublePtr: ptr(&providerConfig{Name: "double-pointer", Secret: "$SECRET:double-pointer-secret"}),
+				ProvidersPtr: map[string]*providerConfig{
+					"provider1": {Name: "provider1", Secret: "$SECRET:secretProvider1"},
+					"provider2": {Name: "provider2", Secret: "$SECRET:secretProvider2"},
+					"provider3": {Name: "provider3", Secret: "$SECRET:secretProvider3"},
+				},
 			},
-			Out: []string{"double-pointer-secret"},
+			Out: []string{"secretProvider1", "secretProvider2", "secretProvider3"},
 		},
 		{
-			Name: "Unexported field should fail to hydrate",
+			Name: "Unexported_field_should_fail_to)hydrate",
 			Input: &config1{
 				unexported: dbConfig{ // unexported fields can't be updated via reflect pkg
 					User:     "db-user",
@@ -97,7 +143,7 @@ func TestCollectFields(t *testing.T) {
 
 	for i, tc := range tt {
 		i, tc := i, tc
-		t.Run(fmt.Sprintf("tt[%v]: %v", i, tc.Name), func(t *testing.T) {
+		t.Run(tc.Name, func(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
 			c := &collector{}
