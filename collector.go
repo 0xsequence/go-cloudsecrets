@@ -41,6 +41,12 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
 		}
 
+	case reflect.Map:
+		for _, key := range v.MapKeys() {
+			item := v.MapIndex(key)
+			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
+		}
+
 	case reflect.String:
 		secretName, found := strings.CutPrefix(v.String(), "$SECRET:")
 		if !found {
