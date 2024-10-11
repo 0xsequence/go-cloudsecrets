@@ -11,6 +11,7 @@ type secretField struct {
 	value      reflect.Value
 	fieldPath  string
 	secretName string
+	hook       func()
 }
 
 type collector struct {
@@ -19,7 +20,7 @@ type collector struct {
 }
 
 // Walks given reflect value recursively and collects any string fields with $SECRET: prefix.
-func (g *collector) collectSecretFields(v reflect.Value, path string) {
+func (g *collector) collectSecretFields(v reflect.Value, path string, hook func()) {
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
@@ -27,18 +28,18 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 		}
 
 		// Dereference pointer
-		g.collectSecretFields(v.Elem(), path)
+		g.collectSecretFields(v.Elem(), path, hook)
 
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
+			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name), hook)
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
 			item := v.Index(i)
-			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
+			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i), hook)
 		}
 
 	case reflect.Map:
@@ -50,12 +51,17 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 				ptr := reflect.New(item.Type())
 				ptr.Elem().Set(item)
 
-				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key))
+				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key), func() {
+					v.SetMapIndex(key, ptr.Elem())
+					if hook != nil {
+						hook()
+					}
+				})
 
 				// Set the modified struct back into the map
-				v.SetMapIndex(key, ptr.Elem())
+
 			} else {
-				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
+				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key), hook)
 			}
 		}
 
@@ -74,6 +80,7 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 			value:      v,
 			fieldPath:  path,
 			secretName: secretName,
+			hook:       hook,
 		})
 
 	default:

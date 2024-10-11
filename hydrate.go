@@ -54,7 +54,7 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 	}
 
 	c := &collector{}
-	c.collectSecretFields(v, "config")
+	c.collectSecretFields(v, "config", nil)
 	if c.err != nil {
 		return fmt.Errorf("failed to collect fields: %w", c.err)
 	}
@@ -69,6 +69,9 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 				return fmt.Errorf("failed to fetch secret %v=%q: %w", field.fieldPath, field.value.String(), err)
 			}
 			field.value.SetString(secretValue)
+			if field.hook != nil {
+				field.hook()
+			}
 
 			return nil
 		})
