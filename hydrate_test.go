@@ -20,6 +20,7 @@ type config struct {
 type service struct {
 	URL  string
 	Auth string
+	Pass string
 }
 
 type db struct {
@@ -75,7 +76,9 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
 				Services: map[string]service{
 					"a": {
+						URL:  "http://localhost:8000",
 						Auth: "$SECRET:auth",
+						Pass: "$SECRET:jwtSecretV2",
 					},
 				},
 			},
@@ -98,7 +101,9 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				},
 				Services: map[string]service{
 					"a": {
+						URL:  "http://localhost:8000",
 						Auth: "auth-secret",
+						Pass: "changeme-now",
 					},
 				},
 			},

@@ -125,7 +125,7 @@ func TestCollectFields(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
 			c := &collector{}
-			c.collectSecretFields(v, fmt.Sprintf("tt[%v].input", i), nil)
+			c.collectSecretFields(v, fmt.Sprintf("tt[%v].input", i))
 
 			if tc.Error {
 				if c.err == nil {

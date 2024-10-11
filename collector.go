@@ -11,16 +11,16 @@ type secretField struct {
 	value      reflect.Value
 	fieldPath  string
 	secretName string
-	hook       func()
 }
 
 type collector struct {
 	fields []*secretField
+	hooks  []func()
 	err    error
 }
 
 // Walks given reflect value recursively and collects any string fields with $SECRET: prefix.
-func (g *collector) collectSecretFields(v reflect.Value, path string, hook func()) {
+func (g *collector) collectSecretFields(v reflect.Value, path string) {
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
@@ -28,18 +28,18 @@ func (g *collector) collectSecretFields(v reflect.Value, path string, hook func(
 		}
 
 		// Dereference pointer
-		g.collectSecretFields(v.Elem(), path, hook)
+		g.collectSecretFields(v.Elem(), path)
 
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name), hook)
+			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
 			item := v.Index(i)
-			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i), hook)
+			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
 		}
 
 	case reflect.Map:
@@ -51,17 +51,16 @@ func (g *collector) collectSecretFields(v reflect.Value, path string, hook func(
 				ptr := reflect.New(item.Type())
 				ptr.Elem().Set(item)
 
-				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key), func() {
+				g.hooks = append(g.hooks, func() {
 					v.SetMapIndex(key, ptr.Elem())
-					if hook != nil {
-						hook()
-					}
 				})
+
+				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key))
 
 				// Set the modified struct back into the map
 
 			} else {
-				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key), hook)
+				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
 			}
 		}
 
@@ -80,7 +79,6 @@ func (g *collector) collectSecretFields(v reflect.Value, path string, hook func(
 			value:      v,
 			fieldPath:  path,
 			secretName: secretName,
-			hook:       hook,
 		})
 
 	default:
