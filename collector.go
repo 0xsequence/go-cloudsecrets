@@ -15,6 +15,7 @@ type secretField struct {
 
 type collector struct {
 	fields []*secretField
+	hooks  []func()
 	err    error
 }
 
@@ -50,10 +51,14 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 				ptr := reflect.New(item.Type())
 				ptr.Elem().Set(item)
 
+				g.hooks = append(g.hooks, func() {
+					v.SetMapIndex(key, ptr.Elem())
+				})
+
 				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key))
 
 				// Set the modified struct back into the map
-				v.SetMapIndex(key, ptr.Elem())
+
 			} else {
 				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
 			}

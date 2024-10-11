@@ -74,5 +74,13 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("failed to hydrate config: %w", err)
+	}
+
+	for _, hook := range c.hooks {
+		hook()
+	}
+
+	return nil
 }
