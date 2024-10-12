@@ -14,13 +14,6 @@ type config struct {
 	Analytics  analytics
 	Pass       string
 	JWTSecrets []string
-	Services   map[string]service
-}
-
-type service struct {
-	URL  string
-	Auth string
-	Pass string
 }
 
 type db struct {
@@ -59,7 +52,6 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				"pass":              "secret",
 				"jwtSecretV1":       "some-old-secret",
 				"jwtSecretV2":       "changeme-now",
-				"auth":              "auth-secret",
 			},
 			conf: &config{
 				Pass: "$SECRET:pass",
@@ -74,13 +66,6 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					AuthToken: "$SECRET:analyticsPassword",
 				},
 				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
-				Services: map[string]service{
-					"a": {
-						URL:  "http://localhost:8000",
-						Auth: "$SECRET:auth",
-						Pass: "$SECRET:jwtSecretV2",
-					},
-				},
 			},
 			wantErr: false,
 			wantConf: &config{
@@ -98,13 +83,6 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				JWTSecrets: []string{
 					"changeme-now",
 					"some-old-secret",
-				},
-				Services: map[string]service{
-					"a": {
-						URL:  "http://localhost:8000",
-						Auth: "auth-secret",
-						Pass: "changeme-now",
-					},
 				},
 			},
 		},
