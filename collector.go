@@ -1,13 +1,12 @@
 package cloudsecrets
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 )
 
-func collectSecrets(v reflect.Value) (map[string]string, error) {
+func collectSecretFields(v reflect.Value) (map[string]string, error) {
 	c := &collector{
 		fields: map[string]string{},
 	}
@@ -20,7 +19,7 @@ func collectSecrets(v reflect.Value) (map[string]string, error) {
 }
 
 type collector struct {
-	fields map[string]string // secret: fieldPath
+	fields map[string]string
 	err    error
 }
 
@@ -71,14 +70,7 @@ func (c *collector) collectSecretFields(v reflect.Value, path string) {
 			return
 		}
 
-		if !v.CanSet() {
-			c.err = errors.Join(c.err, fmt.Errorf("can't set field %v", path))
-			return
-		}
-
-		if p, ok := c.fields[secretName]; ok {
-			c.fields[secretName] = p + "," + path
-		} else {
+		if _, ok := c.fields[secretName]; !ok {
 			c.fields[secretName] = path
 		}
 

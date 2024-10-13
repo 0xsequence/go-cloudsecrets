@@ -141,7 +141,7 @@ func TestCollectFields(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
-			secretFields, err := collectSecrets(v)
+			secretFields, err := collectSecretFields(v)
 			if tc.Error && err == nil {
 				t.Error("expected error, got nil")
 				return

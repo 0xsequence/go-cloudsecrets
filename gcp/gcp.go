@@ -21,7 +21,7 @@ type SecretsProvider struct {
 func NewSecretsProvider() (*SecretsProvider, error) {
 	gcpClient, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("initializing GCP secret manager: %w", err)
+		return nil, fmt.Errorf("secretmanager client: %w", err)
 	}
 
 	var projectNumber string
@@ -59,7 +59,7 @@ func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (stri
 	// Access the secret version
 	result, err := p.client.AccessSecretVersion(reqCtx, req)
 	if err != nil {
-		return "", fmt.Errorf("fetching GCP secret %q: %w", secretId, err)
+		return "", fmt.Errorf("accessing GCP secret %v (%v): %w", secretId, versionId, err)
 	}
 
 	// Return the secret value

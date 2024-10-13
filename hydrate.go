@@ -31,7 +31,7 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 	case "gcp":
 		provider, err = gcp.NewSecretsProvider()
 		if err != nil {
-			return fmt.Errorf("creating gcp secret provider: %w", err)
+			return fmt.Errorf("creating gcp provider: %w", err)
 		}
 
 	default:
@@ -54,19 +54,22 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
 	}
 
-	secretFields, err := collectSecrets(v)
+	secretFields, err := collectSecretFields(v)
 	if err != nil {
-		return fmt.Errorf("failed to collect secrets: %w", err)
+		return fmt.Errorf("collecting secrets: %w", err)
 	}
 
 	secretValues := map[string]string{}
 
 	g := &errgroup.Group{}
 	for secretName, fieldPath := range secretFields {
+		secretName := secretName
+		fieldPath := fieldPath
+
 		g.Go(func() error {
 			secretValue, err := provider.FetchSecret(ctx, secretName)
 			if err != nil {
-				return fmt.Errorf("failed to fetch secret %v=%q: %w", fieldPath, "$SECRET:"+secretName, err)
+				return fmt.Errorf("field %v=%q: fetching secret: %w", fieldPath, "$SECRET:"+secretName, err)
 			}
 
 			log.Printf("Fetched %v\n", secretName)
@@ -76,5 +79,9 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	return replaceSecrets(v, secretValues)
 }
