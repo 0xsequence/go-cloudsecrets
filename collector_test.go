@@ -1,10 +1,11 @@
 package cloudsecrets
 
 import (
-	"fmt"
 	"reflect"
-	"sort"
+	"slices"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestCollectFields(t *testing.T) {
@@ -71,7 +72,7 @@ func TestCollectFields(t *testing.T) {
 				},
 				JWTSecrets: []jwtSecret{"$SECRET:jwtSecret1", "$SECRET:jwtSecret2", "nope"},
 			},
-			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
+			Out: []string{"jwtSecret1", "jwtSecret2", "secretName"},
 		},
 		{
 			Name: "Slice_of_secret_pointer_values",
@@ -82,7 +83,7 @@ func TestCollectFields(t *testing.T) {
 				},
 				JWTSecretsPtr: []*jwtSecret{ptr(jwtSecret("$SECRET:jwtSecret1")), ptr(jwtSecret("$SECRET:jwtSecret2")), ptr(jwtSecret("nope"))},
 			},
-			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
+			Out: []string{"jwtSecret1", "jwtSecret2", "secretName"},
 		},
 		{
 			Name: "Map_with_values",
@@ -107,6 +108,22 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"secretProvider1", "secretProvider2", "secretProvider3"},
 		},
 		{
+			Name: "Duplicated_secret",
+			Input: &cfg{
+				DB: dbConfig{
+					User:     "db-user",
+					Password: "$SECRET:dup",
+				},
+				JWTSecrets: []jwtSecret{"$SECRET:dup", "$SECRET:dup"},
+				ProvidersPtr: map[string]*providerConfig{
+					"provider1": {Name: "provider1", Secret: "$SECRET:dup"},
+					"provider2": {Name: "provider2", Secret: "$SECRET:dup"},
+					"provider3": {Name: "provider3", Secret: "$SECRET:dup"},
+				},
+			},
+			Out: []string{"dup"},
+		},
+		{
 			Name: "Unexported_field_should_fail_to_hydrate",
 			Input: &cfg{
 				unexported: dbConfig{ // unexported fields can't be updated via reflect pkg
@@ -119,39 +136,22 @@ func TestCollectFields(t *testing.T) {
 		},
 	}
 
-	for i, tc := range tt {
-		i, tc := i, tc
+	for _, tc := range tt {
+		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
-			c := &collector{}
-			c.collectSecretFields(v, fmt.Sprintf("tt[%v].input", i))
-
-			if tc.Error {
-				if c.err == nil {
-					t.Error("expected error, got nil")
-					return
-				}
-			} else {
-				if c.err != nil {
-					t.Errorf("unexpected error: %v", c.err)
-					return
-				}
+			secretFields, err := collectSecrets(v)
+			if tc.Error && err == nil {
+				t.Error("expected error, got nil")
+				return
+			} else if !tc.Error && err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
 			}
 
-			if len(c.fields) != len(tc.Out) {
-				t.Errorf("expected %v secrets, got %v", len(tc.Out), len(c.fields))
-			}
-
-			fields := c.fields
-			sort.Slice(fields, func(i, j int) bool {
-				return fields[i].fieldPath <= fields[j].fieldPath
-			})
-
-			for i := 0; i < len(fields); i++ {
-				if fields[i].secretName != tc.Out[i] {
-					t.Errorf("collected field[%v].secretName=%v doesn't match tc.Out[%v]=%v", i, fields[i].secretName, i, tc.Out[i])
-				}
+			if !cmp.Equal(mapKeysSorted(secretFields), tc.Out) {
+				t.Errorf(cmp.Diff(tc.Out, mapKeysSorted(secretFields)))
 			}
 		})
 	}
@@ -181,3 +181,12 @@ type providerConfig struct {
 type jwtSecret string
 
 func ptr[T any](v T) *T { return &v }
+
+func mapKeysSorted(m map[string]string) []string {
+	keys := []string{}
+	for key, _ := range m {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}

@@ -14,6 +14,7 @@ type config struct {
 	Analytics  analytics
 	Pass       string
 	JWTSecrets []string
+	Services   map[string]service
 }
 
 type db struct {
@@ -26,6 +27,12 @@ type analytics struct {
 	Enabled   bool
 	Server    string
 	AuthToken string
+}
+
+type service struct {
+	URL  string
+	Auth string
+	Pass string
 }
 
 func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
@@ -45,13 +52,14 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 		wantConf *config
 	}{
 		{
-			name: "successful replacement",
+			name: "successful_replacement",
 			storage: map[string]string{
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
 				"pass":              "secret",
 				"jwtSecretV1":       "some-old-secret",
 				"jwtSecretV2":       "changeme-now",
+				"auth":              "auth-secret",
 			},
 			conf: &config{
 				Pass: "$SECRET:pass",
@@ -66,6 +74,12 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					AuthToken: "$SECRET:analyticsPassword",
 				},
 				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
+				Services: map[string]service{
+					"service-a": {
+						URL:  "http://localhost:8000",
+						Auth: "$SECRET:auth",
+					},
+				},
 			},
 			wantErr: false,
 			wantConf: &config{
@@ -84,11 +98,20 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					"changeme-now",
 					"some-old-secret",
 				},
+				Services: map[string]service{
+					"service-a": {
+						URL:  "http://localhost:8000",
+						Auth: "auth-secret",
+					},
+				},
 			},
 		},
 		{
-			name:    "failed secret lookup",
-			storage: map[string]string{}, // empty storage, or with invalid keys
+			name: "failed_secret_lookup",
+			storage: map[string]string{
+				"some":    "other",
+				"secrets": "here",
+			},
 			conf: &config{
 				DB: db{
 					Host:     "localhost:9090",
@@ -97,7 +120,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			// expected config is same as input, since no replacements occur
+			// expected config is same as input, since no replacements occurred
 			wantConf: &config{
 				DB: db{
 					Host:     "localhost:9090",

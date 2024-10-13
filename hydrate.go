@@ -3,6 +3,7 @@ package cloudsecrets
 import (
 	"context"
 	"fmt"
+	"log"
 	"reflect"
 
 	"github.com/0xsequence/go-cloudsecrets/gcp"
@@ -53,22 +54,23 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
 	}
 
-	c := &collector{}
-	c.collectSecretFields(v, "config")
-	if c.err != nil {
-		return fmt.Errorf("failed to collect fields: %w", c.err)
+	secretFields, err := collectSecrets(v)
+	if err != nil {
+		return fmt.Errorf("failed to collect secrets: %w", err)
 	}
 
-	g := &errgroup.Group{}
-	for _, field := range c.fields {
-		field := field
+	secretValues := map[string]string{}
 
+	g := &errgroup.Group{}
+	for secretName, fieldPath := range secretFields {
 		g.Go(func() error {
-			secretValue, err := provider.FetchSecret(ctx, field.secretName)
+			secretValue, err := provider.FetchSecret(ctx, secretName)
 			if err != nil {
-				return fmt.Errorf("failed to fetch secret %v=%q: %w", field.fieldPath, field.value.String(), err)
+				return fmt.Errorf("failed to fetch secret %v=%q: %w", fieldPath, "$SECRET:"+secretName, err)
 			}
-			field.value.SetString(secretValue)
+
+			log.Printf("Fetched %v\n", secretName)
+			secretValues[secretName] = secretValue
 
 			return nil
 		})
