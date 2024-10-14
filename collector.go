@@ -49,19 +49,7 @@ func (c *collector) collectSecretFields(v reflect.Value, path string) {
 	case reflect.Map:
 		for _, key := range v.MapKeys() {
 			item := v.MapIndex(key)
-
-			if item.Kind() == reflect.Struct {
-				// If the value is a struct, create a pointer to the map value and modify via pointer
-				ptr := reflect.New(item.Type())
-				ptr.Elem().Set(item)
-
-				c.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key))
-
-				// Set the modified struct back into the map
-				v.SetMapIndex(key, ptr.Elem())
-			} else {
-				c.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
-			}
+			c.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
 		}
 
 	case reflect.String:
