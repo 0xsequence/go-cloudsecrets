@@ -1,67 +1,49 @@
 package cloudsecrets
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
-type secretField struct {
-	value      reflect.Value
-	fieldPath  string
-	secretName string
+// Returns de-duplicated secret keys found recursively in given v.
+func collectSecretKeys(v reflect.Value) []string {
+	c := collector{}
+	c.collectSecretFields(v)
+
+	slices.Sort(c)
+	dedup := slices.Compact(c)
+
+	return []string(dedup)
 }
 
-type collector struct {
-	fields []*secretField
-	hooks  []func()
-	err    error
-}
+type collector []string
 
-// Walks given reflect value recursively and collects any string fields with $SECRET: prefix.
-func (g *collector) collectSecretFields(v reflect.Value, path string) {
+// Walk given reflect value recursively and collects any string fields matching $SECRET: prefix.
+func (c *collector) collectSecretFields(v reflect.Value) {
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
 			return
 		}
-
-		// Dereference pointer
-		g.collectSecretFields(v.Elem(), path)
+		c.collectSecretFields(v.Elem())
 
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			g.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
+			c.collectSecretFields(field)
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
 			item := v.Index(i)
-			g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
+			c.collectSecretFields(item)
 		}
 
 	case reflect.Map:
 		for _, key := range v.MapKeys() {
 			item := v.MapIndex(key)
-
-			if item.Kind() == reflect.Struct {
-				// If the value is a struct, create a pointer to the map value and modify via pointer
-				ptr := reflect.New(item.Type())
-				ptr.Elem().Set(item)
-
-				g.hooks = append(g.hooks, func() {
-					v.SetMapIndex(key, ptr.Elem())
-				})
-
-				g.collectSecretFields(ptr, fmt.Sprintf("%v[%v]", path, key))
-
-				// Set the modified struct back into the map
-
-			} else {
-				g.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
-			}
+			c.collectSecretFields(item)
 		}
 
 	case reflect.String:
@@ -69,17 +51,7 @@ func (g *collector) collectSecretFields(v reflect.Value, path string) {
 		if !found {
 			return
 		}
-
-		if !v.CanSet() {
-			g.err = errors.Join(g.err, fmt.Errorf("can't set field %v", path))
-			return
-		}
-
-		g.fields = append(g.fields, &secretField{
-			value:      v,
-			fieldPath:  path,
-			secretName: secretName,
-		})
+		*c = append(*c, secretName)
 
 	default:
 		return

@@ -17,12 +17,6 @@ type config struct {
 	Services   map[string]service
 }
 
-type service struct {
-	URL  string
-	Auth string
-	Pass string
-}
-
 type db struct {
 	Host     string
 	Username string
@@ -35,13 +29,31 @@ type analytics struct {
 	AuthToken string
 }
 
-func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
-	input := "hello"
-
-	assert.Error(t, Hydrate(context.Background(), "", input))
+type service struct {
+	URL  string
+	Auth string
+	Pass string
 }
 
-func TestReplacePlaceholdersWithSecrets(t *testing.T) {
+func TestHydrateFailIfNotPointerToStruct(t *testing.T) {
+	ctx := context.Background()
+
+	str := "hello"
+	assert.Error(t, Hydrate(ctx, "", str))
+	assert.Error(t, Hydrate(ctx, "", &str))
+
+	slice := []string{"hello", "hello2"}
+	assert.Error(t, Hydrate(ctx, "", slice))
+	assert.Error(t, Hydrate(ctx, "", &slice))
+
+	cfg := struct {
+		X, Y string
+	}{}
+	assert.Error(t, Hydrate(ctx, "", cfg))
+	assert.NoError(t, Hydrate(ctx, "", &cfg))
+}
+
+func TestHydrate(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
@@ -52,7 +64,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 		wantConf *config
 	}{
 		{
-			name: "successful replacement",
+			name: "successful_replacement",
 			storage: map[string]string{
 				"dbPassword":        "changethissecret",
 				"analyticsPassword": "AuthTokenSecret",
@@ -75,10 +87,9 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				},
 				JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
 				Services: map[string]service{
-					"a": {
+					"service-a": {
 						URL:  "http://localhost:8000",
 						Auth: "$SECRET:auth",
-						Pass: "$SECRET:jwtSecretV2",
 					},
 				},
 			},
@@ -100,17 +111,19 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 					"some-old-secret",
 				},
 				Services: map[string]service{
-					"a": {
+					"service-a": {
 						URL:  "http://localhost:8000",
 						Auth: "auth-secret",
-						Pass: "changeme-now",
 					},
 				},
 			},
 		},
 		{
-			name:    "failed secret lookup",
-			storage: map[string]string{}, // empty storage, or with invalid keys
+			name: "failed_secret_lookup",
+			storage: map[string]string{
+				"some":    "other",
+				"secrets": "here",
+			},
 			conf: &config{
 				DB: db{
 					Host:     "localhost:9090",
@@ -119,7 +132,7 @@ func TestReplacePlaceholdersWithSecrets(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			// expected config is same as input, since no replacements occur
+			// expected config is same as input, since no replacements occurred
 			wantConf: &config{
 				DB: db{
 					Host:     "localhost:9090",

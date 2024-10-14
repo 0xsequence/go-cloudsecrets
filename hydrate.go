@@ -30,7 +30,7 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 	case "gcp":
 		provider, err = gcp.NewSecretsProvider()
 		if err != nil {
-			return fmt.Errorf("creating gcp secret provider: %w", err)
+			return fmt.Errorf("creating gcp provider: %w", err)
 		}
 
 	default:
@@ -42,45 +42,45 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 }
 
 func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Value) error {
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return fmt.Errorf("passed config is nil")
-		}
-		v = v.Elem()
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("passed config must be a pointer")
 	}
+	if v.IsNil() {
+		return fmt.Errorf("passed config is nil")
+	}
+	v = v.Elem()
 
 	if v.Kind() != reflect.Struct {
-		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
+		return fmt.Errorf("passed config must be pointer to a struct, got pointer to %s", v.Kind())
 	}
 
-	c := &collector{}
-	c.collectSecretFields(v, "config")
-	if c.err != nil {
-		return fmt.Errorf("failed to collect fields: %w", c.err)
-	}
+	secretKeys := collectSecretKeys(v)
+	secrets := make([]secret, len(secretKeys))
 
 	g := &errgroup.Group{}
-	for _, field := range c.fields {
-		field := field
+	for i, key := range secretKeys {
+		i, key := i, key
 
 		g.Go(func() error {
-			secretValue, err := provider.FetchSecret(ctx, field.secretName)
-			if err != nil {
-				return fmt.Errorf("failed to fetch secret %v=%q: %w", field.fieldPath, field.value.String(), err)
+			value, err := provider.FetchSecret(ctx, key)
+			secrets[i] = secret{
+				key:      key,
+				value:    value,
+				fetchErr: err,
 			}
-			field.value.SetString(secretValue)
 
 			return nil
 		})
 	}
-
 	if err := g.Wait(); err != nil {
-		return fmt.Errorf("failed to hydrate config: %w", err)
+		return err
 	}
 
-	for _, hook := range c.hooks {
-		hook()
-	}
+	return replaceSecrets(v, secrets)
+}
 
-	return nil
+type secret struct {
+	key      string
+	value    string
+	fetchErr error
 }

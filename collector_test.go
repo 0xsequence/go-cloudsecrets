@@ -1,17 +1,17 @@
 package cloudsecrets
 
 import (
-	"fmt"
 	"reflect"
-	"sort"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-func TestCollectFields(t *testing.T) {
+func TestCollectSecretKeys(t *testing.T) {
 	tt := []struct {
 		Name  string
 		Input any
-		Out   []string // field paths
+		Out   []string // collected secret keys
 		Error bool
 	}{
 		{
@@ -71,7 +71,7 @@ func TestCollectFields(t *testing.T) {
 				},
 				JWTSecrets: []jwtSecret{"$SECRET:jwtSecret1", "$SECRET:jwtSecret2", "nope"},
 			},
-			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
+			Out: []string{"jwtSecret1", "jwtSecret2", "secretName"},
 		},
 		{
 			Name: "Slice_of_secret_pointer_values",
@@ -82,7 +82,7 @@ func TestCollectFields(t *testing.T) {
 				},
 				JWTSecretsPtr: []*jwtSecret{ptr(jwtSecret("$SECRET:jwtSecret1")), ptr(jwtSecret("$SECRET:jwtSecret2")), ptr(jwtSecret("nope"))},
 			},
-			Out: []string{"secretName", "jwtSecret1", "jwtSecret2"},
+			Out: []string{"jwtSecret1", "jwtSecret2", "secretName"},
 		},
 		{
 			Name: "Map_with_values",
@@ -107,51 +107,31 @@ func TestCollectFields(t *testing.T) {
 			Out: []string{"secretProvider1", "secretProvider2", "secretProvider3"},
 		},
 		{
-			Name: "Unexported_field_should_fail_to_hydrate",
+			Name: "Duplicated_secret",
 			Input: &cfg{
-				unexported: dbConfig{ // unexported fields can't be updated via reflect pkg
+				DB: dbConfig{
 					User:     "db-user",
-					Password: "$SECRET:secretName", // match inside unexported field
+					Password: "$SECRET:duplicatedKey",
+				},
+				JWTSecrets: []jwtSecret{"$SECRET:duplicatedKey", "$SECRET:duplicatedKey"},
+				ProvidersPtr: map[string]*providerConfig{
+					"provider1": {Name: "provider1", Secret: "$SECRET:duplicatedKey"},
+					"provider2": {Name: "provider2", Secret: "$SECRET:duplicatedKey"},
+					"provider3": {Name: "provider3", Secret: "$SECRET:duplicatedKey"},
 				},
 			},
-			Out:   []string{},
-			Error: true, // expect error
+			Out: []string{"duplicatedKey"},
 		},
 	}
 
-	for i, tc := range tt {
-		i, tc := i, tc
+	for _, tc := range tt {
+		tc := tc
 		t.Run(tc.Name, func(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
-			c := &collector{}
-			c.collectSecretFields(v, fmt.Sprintf("tt[%v].input", i))
-
-			if tc.Error {
-				if c.err == nil {
-					t.Error("expected error, got nil")
-					return
-				}
-			} else {
-				if c.err != nil {
-					t.Errorf("unexpected error: %v", c.err)
-					return
-				}
-			}
-
-			if len(c.fields) != len(tc.Out) {
-				t.Errorf("expected %v secrets, got %v", len(tc.Out), len(c.fields))
-			}
-
-			fields := c.fields
-			sort.Slice(fields, func(i, j int) bool {
-				return fields[i].fieldPath <= fields[j].fieldPath
-			})
-
-			for i := 0; i < len(fields); i++ {
-				if fields[i].secretName != tc.Out[i] {
-					t.Errorf("collected field[%v].secretName=%v doesn't match tc.Out[%v]=%v", i, fields[i].secretName, i, tc.Out[i])
-				}
+			secretFields := collectSecretKeys(v)
+			if !cmp.Equal(secretFields, tc.Out) {
+				t.Errorf(cmp.Diff(tc.Out, secretFields))
 			}
 		})
 	}

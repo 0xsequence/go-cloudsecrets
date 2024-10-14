@@ -21,14 +21,14 @@ type SecretsProvider struct {
 func NewSecretsProvider() (*SecretsProvider, error) {
 	gcpClient, err := secretmanager.NewClient(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("initializing GCP secret manager: %w", err)
+		return nil, fmt.Errorf("gcp: secretmanager client: %w", err)
 	}
 
 	var projectNumber string
 	if metadata.OnGCE() {
 		projectNumber, err = metadata.NumericProjectID()
 		if err != nil {
-			return nil, fmt.Errorf("getting project ID from metadata: %w", err)
+			return nil, fmt.Errorf("gcp: getting project ID from metadata: %w", err)
 		}
 	} else {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -36,7 +36,7 @@ func NewSecretsProvider() (*SecretsProvider, error) {
 
 		projectNumber, err = getProjectNumberFromGcloud(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("getting project ID from gcloud: %w", err)
+			return nil, fmt.Errorf("gcp: getting project ID from gcloud: %w", err)
 		}
 	}
 
@@ -59,7 +59,7 @@ func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (stri
 	// Access the secret version
 	result, err := p.client.AccessSecretVersion(reqCtx, req)
 	if err != nil {
-		return "", fmt.Errorf("fetching GCP secret %q: %w", secretId, err)
+		return "", fmt.Errorf("gcp: accessing secret: %w", err)
 	}
 
 	// Return the secret value
@@ -75,7 +75,7 @@ func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
 	if projectId == "" {
 		out, err := exec.CommandContext(ctx, "gcloud", "config", "get-value", "project").Output()
 		if err != nil {
-			return "", fmt.Errorf("getting current gcloud project (try `gcloud auth application-default login'): %w", err)
+			return "", fmt.Errorf("gcp: getting current gcloud project (try `gcloud auth application-default login'): %w", err)
 		}
 		projectId = strings.TrimSpace(string(out))
 	}
@@ -83,7 +83,7 @@ func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
 	// We need projectNumber (not projectName!) for GCP Secret Manager APIs.
 	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output()
 	if err != nil {
-		return "", fmt.Errorf("getting gcloud projectNumber from projectId %q: %w", projectId, err)
+		return "", fmt.Errorf("gcp: getting gcloud projectNumber from projectId %q: %w", projectId, err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
