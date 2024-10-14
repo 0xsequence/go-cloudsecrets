@@ -23,7 +23,7 @@ func replaceSecrets(v reflect.Value, secrets []secret) error {
 
 	r.replaceSecrets(v, "config")
 	if len(r.errs) > 0 {
-		return fmt.Errorf("failed to replace %v field(s): %w", len(r.errs), errors.Join(r.errs...))
+		return fmt.Errorf("failed to replace %v field(s):\n%v", len(r.errs), errors.Join(r.errs...))
 	}
 
 	return nil
