@@ -7,44 +7,53 @@ import (
 	"strings"
 )
 
-func replaceSecrets(v reflect.Value, secretValues map[string]string) error {
-	c := &replacer{
-		secrets: secretValues,
+// Replace values with "$SECRET:" prefix in v with values from secrets.
+func replaceSecrets(v reflect.Value, secrets []secret) error {
+	r := &replacer{
+		secretValues: map[string]string{},
+		fetchErrors:  map[string]error{},
 	}
-	c.replaceSecrets(v, "config")
-	if c.err != nil {
-		return fmt.Errorf("failed to collect fields: %w", c.err)
+	for _, secret := range secrets {
+		if secret.fetchErr != nil {
+			r.fetchErrors[secret.key] = secret.fetchErr
+		} else {
+			r.secretValues[secret.key] = secret.value
+		}
+	}
+
+	r.replaceSecrets(v, "config")
+	if len(r.errs) > 0 {
+		return fmt.Errorf("failed to replace %v field(s): %w", len(r.errs), errors.Join(r.errs...))
 	}
 
 	return nil
 }
 
 type replacer struct {
-	secrets map[string]string
-	err     error
+	secretValues map[string]string
+	fetchErrors  map[string]error
+	errs         []error
 }
 
-// Walk given value recursively and replace all string fields matching $SECRET: prefix.
-func (c *replacer) replaceSecrets(v reflect.Value, path string) {
+// Walk given v recursively and try to replace all secrets. Record errors along the way.
+func (r *replacer) replaceSecrets(v reflect.Value, path string) {
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
 			return
 		}
-
-		// Dereference pointer
-		c.replaceSecrets(v.Elem(), path)
+		r.replaceSecrets(v.Elem(), path)
 
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			c.replaceSecrets(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
+			r.replaceSecrets(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
 			item := v.Index(i)
-			c.replaceSecrets(item, fmt.Sprintf("%v[%v]", path, i))
+			r.replaceSecrets(item, fmt.Sprintf("%v[%v]", path, i))
 		}
 
 	case reflect.Map:
@@ -52,33 +61,32 @@ func (c *replacer) replaceSecrets(v reflect.Value, path string) {
 			item := v.MapIndex(key)
 
 			if item.Kind() == reflect.Struct {
-				// If the value is a struct, create a pointer to the map value and modify via pointer
+				// If the value is a struct, create a pointer to it, update the value and reassign the map.
 				ptr := reflect.New(item.Type())
 				ptr.Elem().Set(item)
-
-				c.replaceSecrets(ptr, fmt.Sprintf("%v[%v]", path, key))
-
-				// Set the modified struct back into the map
+				r.replaceSecrets(ptr, fmt.Sprintf("%v[%v]", path, key))
 				v.SetMapIndex(key, ptr.Elem())
 			} else {
-				c.replaceSecrets(item, fmt.Sprintf("%v[%v]", path, key))
+				r.replaceSecrets(item, fmt.Sprintf("%v[%v]", path, key))
 			}
 		}
 
 	case reflect.String:
-		secretName, found := strings.CutPrefix(v.String(), "$SECRET:")
+		secretKey, found := strings.CutPrefix(v.String(), "$SECRET:")
 		if !found {
 			return
 		}
 
 		if !v.CanSet() {
-			c.err = errors.Join(c.err, fmt.Errorf("can't set field %v", path))
+			r.errs = append(r.errs, fmt.Errorf("%v: reflect: can't set field", path))
 			return
 		}
 
-		secretValue, ok := c.secrets[secretName]
+		secretValue, ok := r.secretValues[secretKey]
 		if !ok {
-			c.err = errors.Join(c.err, fmt.Errorf("secret %v not found for field %v", secretName, path))
+			err, _ := r.fetchErrors[secretKey]
+			r.errs = append(r.errs, fmt.Errorf("%v: %w", path, err))
+			return
 		}
 		v.SetString(secretValue)
 

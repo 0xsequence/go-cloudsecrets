@@ -2,17 +2,16 @@ package cloudsecrets
 
 import (
 	"reflect"
-	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestCollectFields(t *testing.T) {
+func TestCollectSecretKeys(t *testing.T) {
 	tt := []struct {
 		Name  string
 		Input any
-		Out   []string // field paths
+		Out   []string // collected secret keys
 		Error bool
 	}{
 		{
@@ -112,27 +111,16 @@ func TestCollectFields(t *testing.T) {
 			Input: &cfg{
 				DB: dbConfig{
 					User:     "db-user",
-					Password: "$SECRET:dup",
+					Password: "$SECRET:duplicatedKey",
 				},
-				JWTSecrets: []jwtSecret{"$SECRET:dup", "$SECRET:dup"},
+				JWTSecrets: []jwtSecret{"$SECRET:duplicatedKey", "$SECRET:duplicatedKey"},
 				ProvidersPtr: map[string]*providerConfig{
-					"provider1": {Name: "provider1", Secret: "$SECRET:dup"},
-					"provider2": {Name: "provider2", Secret: "$SECRET:dup"},
-					"provider3": {Name: "provider3", Secret: "$SECRET:dup"},
+					"provider1": {Name: "provider1", Secret: "$SECRET:duplicatedKey"},
+					"provider2": {Name: "provider2", Secret: "$SECRET:duplicatedKey"},
+					"provider3": {Name: "provider3", Secret: "$SECRET:duplicatedKey"},
 				},
 			},
-			Out: []string{"dup"},
-		},
-		{
-			Name: "Unexported_field_should_fail_to_hydrate",
-			Input: &cfg{
-				unexported: dbConfig{ // unexported fields can't be updated via reflect pkg
-					User:     "db-user",
-					Password: "$SECRET:secretName", // match inside unexported field
-				},
-			},
-			Out:   []string{},
-			Error: true, // expect error
+			Out: []string{"duplicatedKey"},
 		},
 	}
 
@@ -141,17 +129,9 @@ func TestCollectFields(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			v := reflect.ValueOf(tc.Input)
 
-			secretFields, err := collectSecretFields(v)
-			if tc.Error && err == nil {
-				t.Error("expected error, got nil")
-				return
-			} else if !tc.Error && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			}
-
-			if !cmp.Equal(mapKeysSorted(secretFields), tc.Out) {
-				t.Errorf(cmp.Diff(tc.Out, mapKeysSorted(secretFields)))
+			secretFields := collectSecretKeys(v)
+			if !cmp.Equal(secretFields, tc.Out) {
+				t.Errorf(cmp.Diff(tc.Out, secretFields))
 			}
 		})
 	}
@@ -181,12 +161,3 @@ type providerConfig struct {
 type jwtSecret string
 
 func ptr[T any](v T) *T { return &v }
-
-func mapKeysSorted(m map[string]string) []string {
-	keys := []string{}
-	for key, _ := range m {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
-}

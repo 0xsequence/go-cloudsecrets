@@ -3,7 +3,6 @@ package cloudsecrets
 import (
 	"context"
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/0xsequence/go-cloudsecrets/gcp"
@@ -43,45 +42,45 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 }
 
 func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Value) error {
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			return fmt.Errorf("passed config is nil")
-		}
-		v = v.Elem()
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("passed config must be a pointer")
 	}
+	if v.IsNil() {
+		return fmt.Errorf("passed config is nil")
+	}
+	v = v.Elem()
 
 	if v.Kind() != reflect.Struct {
-		return fmt.Errorf("passed config must be struct, actual %s", v.Kind())
+		return fmt.Errorf("passed config must be pointer to a struct, got pointer to %s", v.Kind())
 	}
 
-	secretFields, err := collectSecretFields(v)
-	if err != nil {
-		return fmt.Errorf("collecting secrets: %w", err)
-	}
-
-	secretValues := map[string]string{}
+	secretKeys := collectSecretKeys(v)
+	secrets := make([]secret, len(secretKeys))
 
 	g := &errgroup.Group{}
-	for secretName, fieldPath := range secretFields {
-		secretName := secretName
-		fieldPath := fieldPath
+	for i, key := range secretKeys {
+		i, key := i, key
 
 		g.Go(func() error {
-			secretValue, err := provider.FetchSecret(ctx, secretName)
-			if err != nil {
-				return fmt.Errorf("field %v=%q: fetching secret: %w", fieldPath, "$SECRET:"+secretName, err)
+			value, err := provider.FetchSecret(ctx, key)
+			secrets[i] = secret{
+				key:      key,
+				value:    value,
+				fetchErr: err,
 			}
-
-			log.Printf("Fetched %v\n", secretName)
-			secretValues[secretName] = secretValue
 
 			return nil
 		})
 	}
-
 	if err := g.Wait(); err != nil {
 		return err
 	}
 
-	return replaceSecrets(v, secretValues)
+	return replaceSecrets(v, secrets)
+}
+
+type secret struct {
+	key      string
+	value    string
+	fetchErr error
 }

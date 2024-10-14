@@ -35,13 +35,25 @@ type service struct {
 	Pass string
 }
 
-func TestFailWhenPassedValueIsNotStruct(t *testing.T) {
-	input := "hello"
+func TestHydrateFailIfNotPointerToStruct(t *testing.T) {
+	ctx := context.Background()
 
-	assert.Error(t, Hydrate(context.Background(), "", input))
+	str := "hello"
+	assert.Error(t, Hydrate(ctx, "", str))
+	assert.Error(t, Hydrate(ctx, "", &str))
+
+	slice := []string{"hello", "hello2"}
+	assert.Error(t, Hydrate(ctx, "", slice))
+	assert.Error(t, Hydrate(ctx, "", &slice))
+
+	cfg := struct {
+		X, Y string
+	}{}
+	assert.Error(t, Hydrate(ctx, "", cfg))
+	assert.NoError(t, Hydrate(ctx, "", &cfg))
 }
 
-func TestReplacePlaceholdersWithSecrets(t *testing.T) {
+func TestHydrate(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {

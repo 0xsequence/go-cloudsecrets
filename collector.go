@@ -1,55 +1,49 @@
 package cloudsecrets
 
 import (
-	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 )
 
-func collectSecretFields(v reflect.Value) (map[string]string, error) {
-	c := &collector{
-		fields: map[string]string{},
-	}
-	c.collectSecretFields(v, "config")
-	if c.err != nil {
-		return nil, fmt.Errorf("failed to collect fields: %w", c.err)
-	}
+// Returns de-duplicated secret keys found recursively in given v.
+func collectSecretKeys(v reflect.Value) []string {
+	c := collector{}
+	c.collectSecretFields(v)
 
-	return c.fields, nil
+	slices.Sort(c)
+	dedup := slices.Compact(c)
+
+	return []string(dedup)
 }
 
-type collector struct {
-	fields map[string]string
-	err    error
-}
+type collector []string
 
-// Walks given reflect value recursively and collects any string fields matching $SECRET: prefix.
-func (c *collector) collectSecretFields(v reflect.Value, path string) {
+// Walk given reflect value recursively and collects any string fields matching $SECRET: prefix.
+func (c *collector) collectSecretFields(v reflect.Value) {
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
 			return
 		}
-
-		// Dereference pointer
-		c.collectSecretFields(v.Elem(), path)
+		c.collectSecretFields(v.Elem())
 
 	case reflect.Struct:
 		for i := 0; i < v.NumField(); i++ {
 			field := v.Field(i)
-			c.collectSecretFields(field, fmt.Sprintf("%v.%v", path, v.Type().Field(i).Name))
+			c.collectSecretFields(field)
 		}
 
 	case reflect.Slice, reflect.Array:
 		for i := 0; i < v.Len(); i++ {
 			item := v.Index(i)
-			c.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, i))
+			c.collectSecretFields(item)
 		}
 
 	case reflect.Map:
 		for _, key := range v.MapKeys() {
 			item := v.MapIndex(key)
-			c.collectSecretFields(item, fmt.Sprintf("%v[%v]", path, key))
+			c.collectSecretFields(item)
 		}
 
 	case reflect.String:
@@ -57,10 +51,7 @@ func (c *collector) collectSecretFields(v reflect.Value, path string) {
 		if !found {
 			return
 		}
-
-		if _, ok := c.fields[secretName]; !ok {
-			c.fields[secretName] = path
-		}
+		*c = append(*c, secretName)
 
 	default:
 		return

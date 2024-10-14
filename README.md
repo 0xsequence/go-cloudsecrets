@@ -1,17 +1,22 @@
 # go-cloudsecrets
 
-Go package to hydrate runtime secrets from Cloud providers
+Go package for hydrating config secrets from Cloud secret managers
 - [x] `"gcp"`, GCP Secret Manager
 - [ ] `"aws"`, AWS Secrets Manager
+- [ ] `""`, empty provider, which errors out on `$SECRET:` value
 
 ```go
 cloudsecrets.Hydrate(ctx, "gcp", &Config{})
 ```
 
-`Hydrate()` recursively walks a given config (struct pointer) and hydrates all string
-values matching `"$SECRET:"` prefix using a given Cloud secrets provider.
+`Hydrate()` recursively walks given config (a `struct` pointer) and replaces all string
+fields having `"$SECRET:"` prefix with a value fetched from a given Cloud secret provider.
 
-The secret values to be replaced must have a format of `"$SECRET:{name|path}"`.
+The value to be replaced must have a format of `"$SECRET:{name|path}"`.
+
+Secrets are de-duplicated and fetched only once.
+
+The `Hydrate()` function tries to replace as many fields as possible before returning error.
 
 ## Usage
 ```go
@@ -23,7 +28,7 @@ func main() {
 			Database: "postgres",
 			Host:     "localhost:5432",
 			Username: "sequence",
-			DPassword: "$SECRET:dbPassword", // to be hydrated
+			DPassword: "$SECRET:dbPassword", // will be hydrated (replaced with value of "dbPassword" secret)
 		},
 	}
 
