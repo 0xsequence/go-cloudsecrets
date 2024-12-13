@@ -51,6 +51,12 @@ func TestHydrateFailIfNotPointerToStruct(t *testing.T) {
 	}{}
 	assert.Error(t, Hydrate(ctx, "", cfg))
 	assert.NoError(t, Hydrate(ctx, "", &cfg))
+
+	cfgPtr := &cfg
+	assert.NoError(t, Hydrate(ctx, "", &cfgPtr))
+
+	cfgPtrPtr := &cfgPtr
+	assert.NoError(t, Hydrate(ctx, "", &cfgPtrPtr))
 }
 
 func TestHydrate(t *testing.T) {
