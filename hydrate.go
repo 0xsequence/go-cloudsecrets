@@ -48,8 +48,8 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 	if v.IsNil() {
 		return fmt.Errorf("passed config is nil")
 	}
-	v = v.Elem()
 
+	v = ptrDeref(v)
 	if v.Kind() != reflect.Struct {
 		return fmt.Errorf("passed config must be pointer to a struct, got pointer to %s", v.Kind())
 	}
@@ -77,6 +77,15 @@ func hydrateConfig(ctx context.Context, provider secretsProvider, v reflect.Valu
 	}
 
 	return replaceSecrets(v, secrets)
+}
+
+func ptrDeref(v reflect.Value) reflect.Value {
+	if v.Kind() == reflect.Ptr {
+		if v = v.Elem(); v.Kind() == reflect.Ptr {
+			return ptrDeref(v)
+		}
+	}
+	return v
 }
 
 type secret struct {
