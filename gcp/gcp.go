@@ -18,8 +18,8 @@ type SecretsProvider struct {
 	client        *secretmanager.Client
 }
 
-func NewSecretsProvider() (*SecretsProvider, error) {
-	gcpClient, err := secretmanager.NewClient(context.Background())
+func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
+	gcpClient, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("gcp: secretmanager client: %w", err)
 	}
@@ -31,10 +31,10 @@ func NewSecretsProvider() (*SecretsProvider, error) {
 			return nil, fmt.Errorf("gcp: getting project ID from metadata: %w", err)
 		}
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		gcloudCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 
-		projectNumber, err = getProjectNumberFromGcloud(ctx)
+		projectNumber, err = getProjectNumberFromGcloud(gcloudCtx)
 		if err != nil {
 			return nil, fmt.Errorf("gcp: getting project ID from gcloud: %w", err)
 		}
@@ -44,6 +44,10 @@ func NewSecretsProvider() (*SecretsProvider, error) {
 		projectNumber: projectNumber,
 		client:        gcpClient,
 	}, nil
+}
+
+func (p *SecretsProvider) Close() error {
+	return p.client.Close()
 }
 
 func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {

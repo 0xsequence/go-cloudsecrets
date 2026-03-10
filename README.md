@@ -6,7 +6,8 @@ Go package for hydrating config secrets from Cloud secret providers:
 - [x] `nosecrets` — No provider (errors out on any `$SECRET:` value)
 
 ```go
-provider, _ := gcp.NewSecretsProvider()
+provider, _ := gcp.NewSecretsProvider(ctx)
+defer provider.Close()
 err := cloudsecrets.Hydrate(ctx, provider, &cfg)
 ```
 
@@ -33,12 +34,15 @@ var cfg = config.Config{
 }
 
 func main() {
-	provider, err := gcp.NewSecretsProvider()
+	ctx := context.Background()
+
+	provider, err := gcp.NewSecretsProvider(ctx)
 	if err != nil {
 		log.Fatalf("failed to create secrets provider: %v", err)
 	}
+	defer provider.Close()
 
-	err = cloudsecrets.Hydrate(context.Background(), provider, &cfg)
+	err = cloudsecrets.Hydrate(ctx, provider, &cfg)
 	if err != nil {
 		log.Fatalf("failed to hydrate config secrets: %v", err)
 	}
