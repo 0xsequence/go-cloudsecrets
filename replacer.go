@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+type secret struct {
+	key      string
+	value    string
+	fetchErr error
+}
+
 // Replace values with "$SECRET:" prefix in v with values from secrets.
 func replaceSecrets(v reflect.Value, secrets []secret) error {
 	r := &replacer{

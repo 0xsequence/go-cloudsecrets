@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xsequence/go-cloudsecrets"
 	"github.com/0xsequence/go-cloudsecrets/_examples/config"
+	"github.com/0xsequence/go-cloudsecrets/gcp"
 	"github.com/kr/pretty"
 )
 
@@ -20,7 +21,12 @@ func main() {
 		},
 	}
 
-	err := cloudsecrets.Hydrate(context.Background(), "gcp", cfg)
+	provider, err := gcp.NewSecretsProvider()
+	if err != nil {
+		log.Fatalf("failed to create secrets provider: %v", err)
+	}
+
+	err = cloudsecrets.Hydrate(context.Background(), provider, cfg)
 	if err != nil {
 		log.Fatalf("failed to hydrate config secrets: %v", err)
 	}

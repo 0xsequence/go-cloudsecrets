@@ -2,11 +2,13 @@ package cloudsecrets
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
+	"github.com/0xsequence/go-cloudsecrets/env"
 	"github.com/0xsequence/go-cloudsecrets/mock"
+	"github.com/0xsequence/go-cloudsecrets/nosecrets"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type config struct {
@@ -37,26 +39,27 @@ type service struct {
 
 func TestHydrateFailIfNotPointerToStruct(t *testing.T) {
 	ctx := context.Background()
+	provider := nosecrets.NewSecretsProvider()
 
 	str := "hello"
-	assert.Error(t, Hydrate(ctx, "", str))
-	assert.Error(t, Hydrate(ctx, "", &str))
+	assert.Error(t, Hydrate(ctx, provider, str))
+	assert.Error(t, Hydrate(ctx, provider, &str))
 
 	slice := []string{"hello", "hello2"}
-	assert.Error(t, Hydrate(ctx, "", slice))
-	assert.Error(t, Hydrate(ctx, "", &slice))
+	assert.Error(t, Hydrate(ctx, provider, slice))
+	assert.Error(t, Hydrate(ctx, provider, &slice))
 
 	cfg := struct {
 		X, Y string
 	}{}
-	assert.Error(t, Hydrate(ctx, "", cfg))
-	assert.NoError(t, Hydrate(ctx, "", &cfg))
+	assert.Error(t, Hydrate(ctx, provider, cfg))
+	assert.NoError(t, Hydrate(ctx, provider, &cfg))
 
 	cfgPtr := &cfg
-	assert.NoError(t, Hydrate(ctx, "", &cfgPtr))
+	assert.NoError(t, Hydrate(ctx, provider, &cfgPtr))
 
 	cfgPtrPtr := &cfgPtr
-	assert.NoError(t, Hydrate(ctx, "", &cfgPtrPtr))
+	assert.NoError(t, Hydrate(ctx, provider, &cfgPtrPtr))
 }
 
 func TestHydrateEnvProvider(t *testing.T) {
@@ -68,6 +71,9 @@ func TestHydrateEnvProvider(t *testing.T) {
 	t.Setenv("secret_jwtSecretV1", "some-old-secret")
 	t.Setenv("secret_jwtSecretV2", "changeme-now")
 	t.Setenv("secret_auth", "auth-secret")
+
+	provider, err := env.NewSecretsProvider("secret_")
+	require.NoError(t, err)
 
 	conf := &config{
 		Pass: "$SECRET:pass",
@@ -90,7 +96,7 @@ func TestHydrateEnvProvider(t *testing.T) {
 		},
 	}
 
-	err := Hydrate(ctx, "env", conf)
+	err = Hydrate(ctx, provider, conf)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "secret", conf.Pass)
@@ -101,8 +107,30 @@ func TestHydrateEnvProvider(t *testing.T) {
 	assert.Equal(t, "auth-secret", conf.Services["service-a"].Auth)
 }
 
+func TestHydrateEnvProviderCustomPrefix(t *testing.T) {
+	ctx := context.Background()
+
+	t.Setenv("MYAPP_dbPassword", "custom-secret")
+
+	provider, err := env.NewSecretsProvider("MYAPP_")
+	require.NoError(t, err)
+
+	conf := &config{
+		DB: db{
+			Password: "$SECRET:dbPassword",
+		},
+	}
+
+	err = Hydrate(ctx, provider, conf)
+	assert.NoError(t, err)
+	assert.Equal(t, "custom-secret", conf.DB.Password)
+}
+
 func TestHydrateEnvProviderMissingSecret(t *testing.T) {
 	ctx := context.Background()
+
+	provider, err := env.NewSecretsProvider("secret_")
+	require.NoError(t, err)
 
 	conf := &config{
 		DB: db{
@@ -110,7 +138,7 @@ func TestHydrateEnvProviderMissingSecret(t *testing.T) {
 		},
 	}
 
-	err := Hydrate(ctx, "env", conf)
+	err = Hydrate(ctx, provider, conf)
 	assert.Error(t, err)
 }
 
@@ -206,8 +234,8 @@ func TestHydrate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			v := reflect.ValueOf(tt.conf)
-			err := hydrateConfig(ctx, mock.NewSecretsProvider(tt.storage), v)
+			provider := mock.NewSecretsProvider(tt.storage)
+			err := Hydrate(ctx, provider, tt.conf)
 			if err != nil {
 				if tt.wantErr {
 					assert.Equal(t, tt.wantConf, tt.conf)
