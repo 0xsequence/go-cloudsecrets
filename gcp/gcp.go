@@ -50,7 +50,7 @@ func (p *SecretsProvider) Close() error {
 	return p.client.Close()
 }
 
-func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
+func (p *SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{

@@ -1,6 +1,6 @@
 module github.com/0xsequence/go-cloudsecrets/_examples
 
-go 1.24
+go 1.25.0
 
 //replace github.com/0xsequence/go-cloudsecrets => ../
 
