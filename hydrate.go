@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/0xsequence/go-cloudsecrets/env"
 	"github.com/0xsequence/go-cloudsecrets/gcp"
 	"github.com/0xsequence/go-cloudsecrets/nosecrets"
 	"golang.org/x/sync/errgroup"
@@ -26,6 +27,11 @@ func Hydrate(ctx context.Context, providerName string, config interface{}) error
 	case "":
 		// No provider configured. If we see a $SECRET: value, we fail.
 		provider = nosecrets.NewSecretsProvider()
+	case "env":
+		provider, err = env.NewSecretsProvider()
+		if err != nil {
+			return fmt.Errorf("creating env provider: %w", err)
+		}
 
 	case "gcp":
 		provider, err = gcp.NewSecretsProvider()
