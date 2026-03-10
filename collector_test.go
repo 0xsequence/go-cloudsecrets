@@ -131,7 +131,7 @@ func TestCollectSecretKeys(t *testing.T) {
 
 			secretFields := collectSecretKeys(v)
 			if !cmp.Equal(secretFields, tc.Out) {
-				t.Errorf(cmp.Diff(tc.Out, secretFields))
+				t.Error(cmp.Diff(tc.Out, secretFields))
 			}
 		})
 	}
@@ -145,7 +145,6 @@ type cfg struct {
 	JWTSecretsPtr []*jwtSecret
 	Providers     map[string]providerConfig
 	ProvidersPtr  map[string]*providerConfig
-	unexported    dbConfig
 }
 
 type dbConfig struct {

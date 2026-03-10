@@ -26,7 +26,7 @@ func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
 
 	var projectNumber string
 	if metadata.OnGCE() {
-		projectNumber, err = metadata.NumericProjectID()
+		projectNumber, err = metadata.NumericProjectIDWithContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("gcp: getting project ID from metadata: %w", err)
 		}
@@ -85,7 +85,7 @@ func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
 	}
 
 	// We need projectNumber (not projectName!) for GCP Secret Manager APIs.
-	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output()
+	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output() //nolint:gosec // projectId is from env var or gcloud output, not user input
 	if err != nil {
 		return "", fmt.Errorf("gcp: getting gcloud projectNumber from projectId %q: %w", projectId, err)
 	}

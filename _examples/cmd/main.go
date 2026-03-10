@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/kr/pretty"
+
 	"github.com/0xsequence/go-cloudsecrets"
 	"github.com/0xsequence/go-cloudsecrets/_examples/config"
 	"github.com/0xsequence/go-cloudsecrets/gcp"
-	"github.com/kr/pretty"
 )
 
 func main() {

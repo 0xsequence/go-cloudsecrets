@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xsequence/go-cloudsecrets/env"
 	"github.com/0xsequence/go-cloudsecrets/mock"
 	"github.com/0xsequence/go-cloudsecrets/nosecrets"
-	"github.com/stretchr/testify/assert"
 )
 
 type config struct {
