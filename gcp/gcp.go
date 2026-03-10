@@ -31,10 +31,7 @@ func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
 			return nil, fmt.Errorf("gcp: getting project ID from metadata: %w", err)
 		}
 	} else {
-		gcloudCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-
-		projectNumber, err = getProjectNumberFromGcloud(gcloudCtx)
+		projectNumber, err = getProjectNumberFromGcloud(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("gcp: getting project ID from gcloud: %w", err)
 		}
