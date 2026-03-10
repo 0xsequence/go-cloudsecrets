@@ -59,6 +59,61 @@ func TestHydrateFailIfNotPointerToStruct(t *testing.T) {
 	assert.NoError(t, Hydrate(ctx, "", &cfgPtrPtr))
 }
 
+func TestHydrateEnvProvider(t *testing.T) {
+	ctx := context.Background()
+
+	t.Setenv("secret_dbPassword", "changethissecret")
+	t.Setenv("secret_analyticsPassword", "AuthTokenSecret")
+	t.Setenv("secret_pass", "secret")
+	t.Setenv("secret_jwtSecretV1", "some-old-secret")
+	t.Setenv("secret_jwtSecretV2", "changeme-now")
+	t.Setenv("secret_auth", "auth-secret")
+
+	conf := &config{
+		Pass: "$SECRET:pass",
+		DB: db{
+			Host:     "localhost:9090",
+			Username: "postgres",
+			Password: "$SECRET:dbPassword",
+		},
+		Analytics: analytics{
+			Enabled:   true,
+			Server:    "http://localhost:8000",
+			AuthToken: "$SECRET:analyticsPassword",
+		},
+		JWTSecrets: []string{"$SECRET:jwtSecretV2", "$SECRET:jwtSecretV1"},
+		Services: map[string]service{
+			"service-a": {
+				URL:  "http://localhost:8000",
+				Auth: "$SECRET:auth",
+			},
+		},
+	}
+
+	err := Hydrate(ctx, "env", conf)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "secret", conf.Pass)
+	assert.Equal(t, "changethissecret", conf.DB.Password)
+	assert.Equal(t, "localhost:9090", conf.DB.Host)
+	assert.Equal(t, "AuthTokenSecret", conf.Analytics.AuthToken)
+	assert.Equal(t, []string{"changeme-now", "some-old-secret"}, conf.JWTSecrets)
+	assert.Equal(t, "auth-secret", conf.Services["service-a"].Auth)
+}
+
+func TestHydrateEnvProviderMissingSecret(t *testing.T) {
+	ctx := context.Background()
+
+	conf := &config{
+		DB: db{
+			Password: "$SECRET:missingKey",
+		},
+	}
+
+	err := Hydrate(ctx, "env", conf)
+	assert.Error(t, err)
+}
+
 func TestHydrate(t *testing.T) {
 	ctx := context.Background()
 
