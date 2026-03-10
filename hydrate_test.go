@@ -8,7 +8,6 @@ import (
 	"github.com/0xsequence/go-cloudsecrets/mock"
 	"github.com/0xsequence/go-cloudsecrets/nosecrets"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type config struct {
@@ -72,8 +71,7 @@ func TestHydrateEnvProvider(t *testing.T) {
 	t.Setenv("secret_jwtSecretV2", "changeme-now")
 	t.Setenv("secret_auth", "auth-secret")
 
-	provider, err := env.NewSecretsProvider("secret_")
-	require.NoError(t, err)
+	provider := env.NewSecretsProvider("secret_")
 
 	conf := &config{
 		Pass: "$SECRET:pass",
@@ -96,7 +94,7 @@ func TestHydrateEnvProvider(t *testing.T) {
 		},
 	}
 
-	err = Hydrate(ctx, provider, conf)
+	err := Hydrate(ctx, provider, conf)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "secret", conf.Pass)
@@ -112,8 +110,7 @@ func TestHydrateEnvProviderCustomPrefix(t *testing.T) {
 
 	t.Setenv("MYAPP_dbPassword", "custom-secret")
 
-	provider, err := env.NewSecretsProvider("MYAPP_")
-	require.NoError(t, err)
+	provider := env.NewSecretsProvider("MYAPP_")
 
 	conf := &config{
 		DB: db{
@@ -121,7 +118,7 @@ func TestHydrateEnvProviderCustomPrefix(t *testing.T) {
 		},
 	}
 
-	err = Hydrate(ctx, provider, conf)
+	err := Hydrate(ctx, provider, conf)
 	assert.NoError(t, err)
 	assert.Equal(t, "custom-secret", conf.DB.Password)
 }
@@ -129,8 +126,7 @@ func TestHydrateEnvProviderCustomPrefix(t *testing.T) {
 func TestHydrateEnvProviderMissingSecret(t *testing.T) {
 	ctx := context.Background()
 
-	provider, err := env.NewSecretsProvider("secret_")
-	require.NoError(t, err)
+	provider := env.NewSecretsProvider("secret_")
 
 	conf := &config{
 		DB: db{
@@ -138,7 +134,7 @@ func TestHydrateEnvProviderMissingSecret(t *testing.T) {
 		},
 	}
 
-	err = Hydrate(ctx, provider, conf)
+	err := Hydrate(ctx, provider, conf)
 	assert.Error(t, err)
 }
 

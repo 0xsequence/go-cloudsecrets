@@ -16,7 +16,7 @@ func NewSecretsProvider(secrets map[string]string) *SecretsProvider {
 func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	secret, ok := p.secrets[secretId]
 	if !ok {
-		return "", fmt.Errorf("find secret %q", secretId)
+		return "", fmt.Errorf("mock: fetch secret %q: not found", secretId)
 	}
 
 	return secret, nil

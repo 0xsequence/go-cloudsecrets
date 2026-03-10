@@ -59,7 +59,7 @@ func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (stri
 	// Access the secret version
 	result, err := p.client.AccessSecretVersion(reqCtx, req)
 	if err != nil {
-		return "", fmt.Errorf("gcp: accessing secret: %w", err)
+		return "", fmt.Errorf("gcp: fetch secret %q: %w", secretId, err)
 	}
 
 	// Return the secret value

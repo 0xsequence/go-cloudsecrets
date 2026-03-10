@@ -14,7 +14,7 @@ import (
 // The secret values to be replaced must have a format of "$SECRET:{name|path}".
 func Hydrate(ctx context.Context, provider SecretsProvider, config any) error {
 	v := reflect.ValueOf(config)
-	if v.Kind() != reflect.Ptr {
+	if v.Kind() != reflect.Pointer {
 		return fmt.Errorf("passed config must be a pointer")
 	}
 	if v.IsNil() {
