@@ -1,0 +1,76 @@
+version: "2"
+run:
+  concurrency: 8
+output:
+  sort-order:
+    - linter
+    - file
+    - severity
+linters:
+  default: none
+  enable: # https://golangci-lint.run/docs/linters
+    - govet
+    - errcheck # Detects unhandled errors.
+    - errorlint # Finds code that can cause problems with the error wrapping scheme introduced in Go 1.13.
+    - staticcheck # Enables SA checks: https://staticcheck.dev/docs/checks
+    - unused # Checks for unused constants, variables, functions and types.
+    - bodyclose # Checks whether HTTP response body is closed successfully.
+    - errname # Enforces that sentinel errors are prefixed with the Err and error types are suffixed with the Error.
+    - exptostd # Detects functions from golang.org/x/exp/ that can be replaced by std functions.
+    - fatcontext # Detects nested contexts in loops and function literals.
+    - usestdlibvars # Detects the possibility to use variables/constants from the Go standard library.
+    - gosec
+  settings:
+    errcheck:
+      exclude-functions:
+        - (net/http.ResponseWriter).Write
+    errorlint:
+      errorf: true
+      errorf-multi: true
+      asserts: true
+      comparison: true
+    usestdlibvars:
+      http-status-code: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - lll
+        source: '^//go:generate '
+      - path: _test\.go
+        linters:
+          - gosec
+        text: "Potential hardcoded credentials"
+      - path: _test\.go
+        linters:
+          - gosec
+        text: "matches secret pattern"
+    paths:
+      - .*\.gen\.go$
+      - vendor
+      - bin
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/0xsequence/go-cloudsecrets)
+      custom-order: true
+      no-lex-order: false
+  exclusions:
+    generated: lax
+    paths:
+      - .*\.gen\.go$
+      - vendor
+      - bin

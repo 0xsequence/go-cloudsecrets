@@ -15,5 +15,5 @@ func NewSecretsProvider() *SecretsProvider {
 }
 
 func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
-	return "", fmt.Errorf("fetch secret %q: %w", secretId, ErrNoSecretsProvider)
+	return "", fmt.Errorf("nosecrets: fetch secret %q: %w", secretId, ErrNoSecretsProvider)
 }

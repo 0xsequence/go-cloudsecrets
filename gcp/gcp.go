@@ -18,22 +18,19 @@ type SecretsProvider struct {
 	client        *secretmanager.Client
 }
 
-func NewSecretsProvider() (*SecretsProvider, error) {
-	gcpClient, err := secretmanager.NewClient(context.Background())
+func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
+	gcpClient, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("gcp: secretmanager client: %w", err)
 	}
 
 	var projectNumber string
 	if metadata.OnGCE() {
-		projectNumber, err = metadata.NumericProjectID()
+		projectNumber, err = metadata.NumericProjectIDWithContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("gcp: getting project ID from metadata: %w", err)
 		}
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
 		projectNumber, err = getProjectNumberFromGcloud(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("gcp: getting project ID from gcloud: %w", err)
@@ -46,7 +43,11 @@ func NewSecretsProvider() (*SecretsProvider, error) {
 	}, nil
 }
 
-func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
+func (p *SecretsProvider) Close() error {
+	return p.client.Close()
+}
+
+func (p *SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	versionId := "latest"
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
@@ -59,7 +60,7 @@ func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (stri
 	// Access the secret version
 	result, err := p.client.AccessSecretVersion(reqCtx, req)
 	if err != nil {
-		return "", fmt.Errorf("gcp: accessing secret: %w", err)
+		return "", fmt.Errorf("gcp: access secret version %q: %w", secretId, err)
 	}
 
 	// Return the secret value
@@ -81,7 +82,7 @@ func getProjectNumberFromGcloud(ctx context.Context) (string, error) {
 	}
 
 	// We need projectNumber (not projectName!) for GCP Secret Manager APIs.
-	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output()
+	out, err := exec.CommandContext(ctx, "gcloud", "projects", "describe", projectId, "--format=value(projectNumber)").Output() //nolint:gosec // projectId is from env var or gcloud output, not user input
 	if err != nil {
 		return "", fmt.Errorf("gcp: getting gcloud projectNumber from projectId %q: %w", projectId, err)
 	}

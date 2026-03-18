@@ -4,7 +4,7 @@ import (
 	"context"
 )
 
-type secretsProvider interface {
+type SecretsProvider interface {
 	FetchSecret(ctx context.Context, secretId string) (string, error)
 
 	// TODO: Support bulk operation, i.e. FetchSecrets(ctx, map[string]string).

@@ -1,15 +1,17 @@
 # go-cloudsecrets
 
 Go package for hydrating config secrets from Cloud secret providers:
-- [x] `"gcp"` GCP Secret Manager
-- [ ] `"aws"` AWS Secrets Manager
-- [ ] `""` no provider (errors out on any `$SECRET:` value)
+- [x] `gcp` — GCP Secret Manager
+- [x] `env` — Environment variables (configurable prefix)
+- [x] `nosecrets` — No provider (errors out on any `$SECRET:` value)
 
 ```go
-err := cloudsecrets.Hydrate(ctx, "gcp", &cfg)
+provider, _ := gcp.NewSecretsProvider(ctx)
+defer provider.Close()
+err := cloudsecrets.Hydrate(ctx, provider, &cfg)
 ```
 
-The `Hydrate()` function recursively walks given `cfg` and replaces all fields matching `"$SECRET:{key}"` string format with a value fetched from Cloud provider.
+The `Hydrate()` function recursively walks given `cfg` and replaces all fields matching `"$SECRET:{key}"` string format with a value fetched from the given provider.
 
 All referenced secret keys are de-duplicated and fetched only once.
 
@@ -17,7 +19,10 @@ The `Hydrate()` function tries to replace all fields before returning any error(
 
 ## Usage
 ```go
-import "github.com/0xsequence/go-cloudsecrets/cloudsecrets"
+import (
+	"github.com/0xsequence/go-cloudsecrets"
+	"github.com/0xsequence/go-cloudsecrets/gcp"
+)
 
 var cfg = config.Config{
 	DB: &config.DB{
@@ -29,7 +34,15 @@ var cfg = config.Config{
 }
 
 func main() {
-	err := cloudsecrets.Hydrate(context.Background(), "gcp", &cfg)
+	ctx := context.Background()
+
+	provider, err := gcp.NewSecretsProvider(ctx)
+	if err != nil {
+		log.Fatalf("failed to create secrets provider: %v", err)
+	}
+	defer provider.Close()
+
+	err = cloudsecrets.Hydrate(ctx, provider, &cfg)
 	if err != nil {
 		log.Fatalf("failed to hydrate config secrets: %v", err)
 	}
