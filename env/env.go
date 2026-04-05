@@ -20,7 +20,7 @@ func (p SecretsProvider) FetchSecret(ctx context.Context, secretId string) (stri
 	name := p.prefix + secretId
 	value, ok := os.LookupEnv(name)
 	if !ok {
-		return "", fmt.Errorf("env: fetch secret %q: not found", name)
+		return "", fmt.Errorf("env: fetch secret %q (env var %q): not found", secretId, name)
 	}
 	return value, nil
 }
