@@ -12,11 +12,17 @@ import (
 )
 
 type config struct {
-	DB         db
-	Analytics  analytics
-	Pass       string
-	JWTSecrets []string
-	Services   map[string]service
+	DB              db
+	Analytics       analytics
+	Pass            string
+	JWTSecrets      []string
+	Services        map[string]service
+	InboundWebhooks InboundWebhooksConfig
+}
+
+type InboundWebhooksConfig struct {
+	Secrets     map[string]string `toml:"secrets"`
+	MaxBodySize int64             `toml:"max_body_size"`
 }
 
 type db struct {
@@ -152,12 +158,15 @@ func TestHydrate(t *testing.T) {
 		{
 			name: "successful_replacement",
 			storage: map[string]string{
-				"dbPassword":        "changethissecret",
-				"analyticsPassword": "AuthTokenSecret",
-				"pass":              "secret",
-				"jwtSecretV1":       "some-old-secret",
-				"jwtSecretV2":       "changeme-now",
-				"auth":              "auth-secret",
+				"dbPassword":          "changethissecret",
+				"analyticsPassword":   "AuthTokenSecret",
+				"pass":                "secret",
+				"jwtSecretV1":         "some-old-secret",
+				"jwtSecretV2":         "changeme-now",
+				"auth":                "auth-secret",
+				"inbound_webhook_foo": "foo-secret",
+				"inbound_webhook_bar": "bar-secret",
+				"inbound_webhook_baz": "baz-secret",
 			},
 			conf: &config{
 				Pass: "$SECRET:pass",
@@ -177,6 +186,14 @@ func TestHydrate(t *testing.T) {
 						URL:  "http://localhost:8000",
 						Auth: "$SECRET:auth",
 					},
+				},
+				InboundWebhooks: InboundWebhooksConfig{
+					Secrets: map[string]string{
+						"foo": "$SECRET:inbound_webhook_foo",
+						"bar": "$SECRET:inbound_webhook_bar",
+						"baz": "$SECRET:inbound_webhook_baz",
+					},
+					MaxBodySize: 1024,
 				},
 			},
 			wantErr: false,
@@ -201,6 +218,14 @@ func TestHydrate(t *testing.T) {
 						URL:  "http://localhost:8000",
 						Auth: "auth-secret",
 					},
+				},
+				InboundWebhooks: InboundWebhooksConfig{
+					Secrets: map[string]string{
+						"foo": "foo-secret",
+						"bar": "bar-secret",
+						"baz": "baz-secret",
+					},
+					MaxBodySize: 1024,
 				},
 			},
 		},
