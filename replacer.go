@@ -66,15 +66,14 @@ func (r *replacer) replaceSecrets(v reflect.Value, path string) {
 		for _, key := range v.MapKeys() {
 			item := v.MapIndex(key)
 
-			if item.Kind() == reflect.Struct {
-				// If the value is a struct, create a pointer to it, update the value and reassign the map.
-				ptr := reflect.New(item.Type())
-				ptr.Elem().Set(item)
-				r.replaceSecrets(ptr, fmt.Sprintf("%v[%v]", path, key))
-				v.SetMapIndex(key, ptr.Elem())
-			} else {
-				r.replaceSecrets(item, fmt.Sprintf("%v[%v]", path, key))
-			}
+			// Map values returned by MapIndex are not addressable and therefore
+			// not settable via reflect (this applies to strings, structs, and
+			// any other value kind). Copy the value into an addressable pointer,
+			// mutate it via recursion, and write the updated value back.
+			ptr := reflect.New(item.Type())
+			ptr.Elem().Set(item)
+			r.replaceSecrets(ptr.Elem(), fmt.Sprintf("%v[%v]", path, key))
+			v.SetMapIndex(key, ptr.Elem())
 		}
 
 	case reflect.String:
