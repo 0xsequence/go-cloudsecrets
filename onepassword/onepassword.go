@@ -1,51 +1,45 @@
 package onepassword
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
+	"os/exec"
+	"strings"
 	"time"
-
-	"github.com/1password/onepassword-sdk-go"
 )
 
-const (
-	integrationName    = "go-cloudsecrets"
-	integrationVersion = "v1.0.0"
-	fetchTimeout       = 10 * time.Second
-)
+const fetchTimeout = 10 * time.Second
 
-// SecretsProvider resolves "op://<vault>/<item>/<field>" references via the
-// official 1Password Go SDK. The service account token is read from the
-// OP_SERVICE_ACCOUNT_TOKEN environment variable.
+// SecretsProvider resolves "op://<vault>/<item>/<field>" references by
+// shelling out to the 1Password CLI ("op"). The CLI handles authentication —
+// biometric desktop integration, "op signin" sessions, or a service account
+// token via OP_SERVICE_ACCOUNT_TOKEN — so the provider has no auth knobs.
 type SecretsProvider struct {
-	client *onepassword.Client
+	binary string
 }
 
-func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
-	token := os.Getenv("OP_SERVICE_ACCOUNT_TOKEN")
-	if token == "" {
-		return nil, fmt.Errorf("onepassword: OP_SERVICE_ACCOUNT_TOKEN not set")
-	}
-
-	client, err := onepassword.NewClient(ctx,
-		onepassword.WithServiceAccountToken(token),
-		onepassword.WithIntegrationInfo(integrationName, integrationVersion),
-	)
+func NewSecretsProvider() (*SecretsProvider, error) {
+	binary, err := exec.LookPath("op")
 	if err != nil {
-		return nil, fmt.Errorf("onepassword: new client: %w", err)
+		return nil, fmt.Errorf("onepassword: locating op binary in PATH: %w", err)
 	}
-
-	return &SecretsProvider{client: client}, nil
+	return &SecretsProvider{binary: binary}, nil
 }
 
 func (p *SecretsProvider) FetchSecret(ctx context.Context, secretId string) (string, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 
-	value, err := p.client.Secrets().Resolve(reqCtx, secretId)
-	if err != nil {
-		return "", fmt.Errorf("onepassword: resolve secret %q: %w", secretId, err)
+	var stdout, stderr bytes.Buffer
+	cmd := exec.CommandContext(reqCtx, p.binary, "read", secretId) //nolint:gosec // secretId comes from caller config, not external user input; exec runs without a shell
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if stderrMsg := strings.TrimSpace(stderr.String()); stderrMsg != "" {
+			return "", fmt.Errorf("onepassword: read secret %q: %w: %s", secretId, err, stderrMsg)
+		}
+		return "", fmt.Errorf("onepassword: read secret %q: %w", secretId, err)
 	}
-	return value, nil
+	return strings.TrimSuffix(stdout.String(), "\n"), nil
 }

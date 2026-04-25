@@ -1,47 +1,65 @@
 # onepassword
 
-A `SecretsProvider` backed by [1Password](https://1password.com) via the [official Go SDK](https://github.com/1Password/onepassword-sdk-go).
+A `SecretsProvider` backed by [1Password](https://1password.com), implemented as a thin wrapper around the [`op` CLI](https://developer.1password.com/docs/cli/get-started/). The CLI handles authentication, so this provider works with every 1Password plan (Personal, Teams, Business) and every supported auth mode.
 
-## Setup
+## Why a CLI wrapper instead of the Go SDK
 
-### 1. Create a vault
+- **Plan-agnostic.** The official Go SDK requires a service account token (Business plan only). The CLI works with personal sign-in, biometric desktop integration, `op signin` session tokens, *and* service account tokens — anything the CLI can authenticate.
+- **No vendored runtime.** The SDK ships a WASM core (~10 MB) executed via `wazero`. The CLI wrapper is plain `os/exec`, no extra deps.
+- **Better local-dev UX.** Developers tap Touch ID once; secrets resolve. No service account tokens to copy into dotfiles.
 
-In the 1Password web app, create a vault to hold your secrets (e.g. `prod-secrets`). Vaults are the access-control unit — service accounts get permissions per vault.
+## Prerequisites
 
-### 2. Add items with secrets
+Install the CLI (one-time per machine):
 
-Inside the vault, create items. Item type doesn't matter (Login, Password, API Credential, Secure Note all work) — only field names matter for resolution.
+```bash
+brew install --cask 1password-cli   # macOS
+# Linux/Windows: see https://developer.1password.com/docs/cli/get-started/
+```
 
-Example: item `db` with field `password` becomes the reference `op://prod-secrets/db/password`.
+Verify:
 
-For multi-line values (TLS certs, JSON keys, full DSNs), use a Secure Note or a multi-line text field — `Resolve` returns the raw string verbatim.
+```bash
+op --version
+```
 
-### 3. Create a service account
+## Authenticating
 
-> Service accounts are a **1Password Business** feature. Teams plan does not include them.
+The provider doesn't manage auth — it shells out to `op` and lets the CLI use whatever method is configured. Pick the one that matches your environment:
 
-In the 1Password web app: **Developer Tools** → **Service Accounts** → **Create Service Account**.
+### Local dev — biometric desktop integration (recommended)
 
-- Grant **Read** access to only the vaults this service needs.
-- On creation, 1Password shows the token (starts with `ops_`) **once** — copy it immediately.
+In the 1Password macOS/Windows app: **Settings → Developer → Integrate with 1Password CLI**. Enables Touch ID for `op` commands. Works on any plan.
 
-### 4. Provide the token at runtime
+### Local dev — interactive session
 
-Set the `OP_SERVICE_ACCOUNT_TOKEN` environment variable. In production, load it from your platform's secret store (GCP Secret Manager, AWS SSM, Kubernetes Secret) and inject as env.
+```bash
+eval "$(op signin)"
+```
+
+Creates a session token in your shell. Works on any plan.
+
+### Production / CI — service account token
 
 ```bash
 export OP_SERVICE_ACCOUNT_TOKEN=ops_eyJzaWdu...
 ```
 
-### 5. Sanity-check with the `op` CLI
+The CLI auto-detects this env var and uses it without prompting. Requires 1Password **Business** to provision service accounts.
 
-Before integrating, confirm the token and reference work:
+## Reference format
+
+Pass-through: secret IDs are full 1Password reference URIs of the form `op://<vault>/<item>/<field>`. Vault and item names with spaces are tolerated by 1Password but best avoided — name them with no spaces from day one.
+
+## Sanity check
+
+Before integrating, confirm the CLI and reference work:
 
 ```bash
 op read "op://prod-secrets/db/password"
 ```
 
-If `op read` returns the value, the Go provider will too. If it doesn't, fix the 1Password side first — the provider can't surface anything `op read` can't.
+If `op read` returns the value, the Go provider will too. If it doesn't, fix the auth/permissions on the 1Password side first — the provider can't surface anything `op read` can't.
 
 ## Usage
 
@@ -62,7 +80,7 @@ cfg := Config{
 func main() {
     ctx := context.Background()
 
-    provider, err := onepassword.NewSecretsProvider(ctx)
+    provider, err := onepassword.NewSecretsProvider()
     if err != nil {
         log.Fatalf("failed to create secrets provider: %v", err)
     }
@@ -73,12 +91,9 @@ func main() {
 }
 ```
 
-## Reference format
-
-Pass-through: secret IDs are full 1Password reference URIs of the form `op://<vault>/<item>/<field>`. Vault and item names with spaces are tolerated by 1Password but best avoided — name them with no spaces from day one.
-
 ## Caveats
 
-- The 1Password Go SDK embeds a WASM core executed via `wazero`. Pure Go (no CGO), but expect ~10 MB additional binary size.
-- The provider has no `Close()` — the SDK client holds no closeable resources.
-- Per-call timeout is 10 seconds.
+- Requires `op` on `PATH`. The constructor verifies this and returns an error if missing.
+- Each `FetchSecret` spawns a subprocess. `Hydrate` parallelizes via `errgroup`, so at boot the cost is roughly one process spawn instead of one per secret in serial. Fine for startup config; not ideal for hot paths.
+- Per-call timeout is 10 seconds, which includes any biometric prompt. If you tap Touch ID slowly, the call fails — sign-in interactively first via `eval "$(op signin)"` to skip the prompt.
+- The provider has no `Close()` — there's no persistent resource to release.

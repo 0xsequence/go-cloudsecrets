@@ -13,8 +13,9 @@ import (
 )
 
 func main() {
-	// Adjust the op:// references to point at items in a vault your service
-	// account can read. Run with OP_SERVICE_ACCOUNT_TOKEN set in the env.
+	// Adjust the op:// references to point at items in a vault your 1Password
+	// CLI session can read. Authenticate via biometric desktop integration,
+	// `eval "$(op signin)"`, or OP_SERVICE_ACCOUNT_TOKEN before running.
 	var cfg = &config.Config{
 		DB: &config.DB{
 			Database: "db_name",
@@ -26,7 +27,7 @@ func main() {
 
 	ctx := context.Background()
 
-	provider, err := onepassword.NewSecretsProvider(ctx)
+	provider, err := onepassword.NewSecretsProvider()
 	if err != nil {
 		log.Fatalf("failed to create secrets provider: %v", err)
 	}
