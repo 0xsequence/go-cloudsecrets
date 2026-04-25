@@ -75,6 +75,24 @@ op read "op://prod-secrets/db/password"
 
 If `op read` returns the value, the Go provider will too. If it doesn't, fix the auth/permissions on the 1Password side first — the provider can't surface anything `op read` can't.
 
+## Try the example
+
+This repo's [`_examples/cmd/onepassword`](../_examples/cmd/onepassword/main.go) directory has a runnable demo. Provision a throwaway vault, run it end-to-end, then clean up:
+
+```bash
+# Create a test vault and item the example references
+op vault create cloudsecrets-test
+op item create --category=login --vault=cloudsecrets-test --title=db \
+    username=test-user password=hunter2
+
+# Run — should hydrate $SECRET:op://... placeholders with the values above
+cd _examples
+make run-onepassword
+
+# Cleanup when you're done
+op vault delete cloudsecrets-test
+```
+
 ## Usage
 
 ```go
