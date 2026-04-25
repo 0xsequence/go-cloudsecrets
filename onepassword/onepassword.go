@@ -19,11 +19,32 @@ type SecretsProvider struct {
 	binary string
 }
 
-func NewSecretsProvider() (*SecretsProvider, error) {
+// NewSecretsProvider locates the op binary on PATH and verifies it can
+// access 1Password by invoking "op vault list". Returns an error if the
+// binary is missing or the CLI cannot authenticate.
+//
+// "op vault list" is used instead of "op whoami" because the latter does
+// not trigger biometric desktop integration and reports "not signed in"
+// even when other commands work fine.
+func NewSecretsProvider(ctx context.Context) (*SecretsProvider, error) {
 	binary, err := exec.LookPath("op")
 	if err != nil {
 		return nil, fmt.Errorf("onepassword: locating op binary in PATH: %w", err)
 	}
+
+	reqCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
+
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(reqCtx, binary, "vault", "list")
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return nil, fmt.Errorf("onepassword: verifying op CLI auth via vault list: %w: %s", err, msg)
+		}
+		return nil, fmt.Errorf("onepassword: verifying op CLI auth via vault list: %w", err)
+	}
+
 	return &SecretsProvider{binary: binary}, nil
 }
 

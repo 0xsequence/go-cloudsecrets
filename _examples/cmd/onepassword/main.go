@@ -27,7 +27,7 @@ func main() {
 
 	ctx := context.Background()
 
-	provider, err := onepassword.NewSecretsProvider()
+	provider, err := onepassword.NewSecretsProvider(ctx)
 	if err != nil {
 		log.Fatalf("failed to create secrets provider: %v", err)
 	}

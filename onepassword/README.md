@@ -4,7 +4,7 @@ A `SecretsProvider` backed by [1Password](https://1password.com), implemented as
 
 ## Why a CLI wrapper instead of the Go SDK
 
-- **Plan-agnostic.** The official Go SDK requires a service account token (Business plan only). The CLI works with personal sign-in, biometric desktop integration, `op signin` session tokens, *and* service account tokens — anything the CLI can authenticate.
+- **Plan-agnostic.** The official Go SDK requires a service account token (Business plan only by default). The CLI works with personal sign-in, biometric desktop integration, `op signin` session tokens, *and* service account tokens — anything the CLI can authenticate.
 - **No vendored runtime.** The SDK ships a WASM core (~10 MB) executed via `wazero`. The CLI wrapper is plain `os/exec`, no extra deps.
 - **Better local-dev UX.** Developers tap Touch ID once; secrets resolve. No service account tokens to copy into dotfiles.
 
@@ -25,13 +25,27 @@ op --version
 
 ## Authenticating
 
-The provider doesn't manage auth — it shells out to `op` and lets the CLI use whatever method is configured. Pick the one that matches your environment:
+The provider doesn't manage auth — it shells out to `op` and lets the CLI use whatever method is configured. Pick the one that matches your environment.
 
 ### Local dev — biometric desktop integration (recommended)
 
-In the 1Password macOS/Windows app: **Settings → Developer → Integrate with 1Password CLI**. Enables Touch ID for `op` commands. Works on any plan.
+Pairs the CLI with the 1Password desktop app so `op` commands authenticate via Touch ID. **Order matters** — these steps depend on each other:
+
+1. **Install the `op` CLI first** (see Prerequisites above). The toggle in the next step stays grayed out until `op` is on `PATH`.
+2. **Fully quit the 1Password desktop app** (`Cmd-Q` on macOS — closing the window is not enough) and reopen it. Without a restart, the app won't pick up that the CLI is now installed.
+3. In the desktop app: **Settings → Developer → Integrate with 1Password CLI**. The checkbox should now be enabled — turn it on.
+4. (Optional) **Settings → Developer → Integrate with other apps** also becomes enabled at this point. Leave it off unless you're also using the 1Password Go SDK.
+5. Verify:
+   ```bash
+   op vault list
+   ```
+   First call prompts for biometric/Touch ID, then prints your accessible vaults.
+
+If the toggle in step 3 is still grayed out after a CLI install + full app restart, your org has locked CLI integration via MDM/policy. Ask an admin to enable it in your 1Password Business policy.
 
 ### Local dev — interactive session
+
+Alternative if you don't want desktop integration:
 
 ```bash
 eval "$(op signin)"
@@ -80,7 +94,7 @@ cfg := Config{
 func main() {
     ctx := context.Background()
 
-    provider, err := onepassword.NewSecretsProvider()
+    provider, err := onepassword.NewSecretsProvider(ctx)
     if err != nil {
         log.Fatalf("failed to create secrets provider: %v", err)
     }
@@ -94,6 +108,7 @@ func main() {
 ## Caveats
 
 - Requires `op` on `PATH`. The constructor verifies this and returns an error if missing.
+- The constructor also runs `op vault list` to fail fast if the CLI cannot access 1Password. First call may trigger a biometric prompt if desktop integration is on. (`op whoami` is *not* used because it doesn't trigger biometric integration and reports "not signed in" even when other commands work.)
 - Each `FetchSecret` spawns a subprocess. `Hydrate` parallelizes via `errgroup`, so at boot the cost is roughly one process spawn instead of one per secret in serial. Fine for startup config; not ideal for hot paths.
 - Per-call timeout is 10 seconds, which includes any biometric prompt. If you tap Touch ID slowly, the call fails — sign-in interactively first via `eval "$(op signin)"` to skip the prompt.
 - The provider has no `Close()` — there's no persistent resource to release.
