@@ -65,6 +65,25 @@ The CLI auto-detects this env var and uses it without prompting. Requires 1Passw
 
 Pass-through: secret IDs are full 1Password reference URIs of the form `op://<vault>/<item>/<field>`. Vault and item names with spaces are tolerated by 1Password but best avoided — name them with no spaces from day one.
 
+### Bare names via `WithDefaultPath`
+
+If most of your secrets live in a single vault/item, configure a default path and use bare names — handy when migrating from the `env` provider's `$SECRET:KEY` style:
+
+```go
+provider, err := onepassword.NewSecretsProvider(ctx,
+    onepassword.WithDefaultPath("omsx-local", "omsx"),
+)
+```
+
+With this option, both shapes work side by side:
+
+| Config value                                            | Resolves as                                       |
+| ------------------------------------------------------- | ------------------------------------------------- |
+| `$SECRET:FRONTEGG_ADMIN_CLIENT_ID`                      | `op://omsx-local/omsx/FRONTEGG_ADMIN_CLIENT_ID`   |
+| `$SECRET:op://other-vault/other-item/SOME_KEY`          | `op://other-vault/other-item/SOME_KEY` (verbatim) |
+
+Bare names without a configured default path return an error rather than guessing a vault.
+
 ## Sanity check
 
 Before integrating, confirm the CLI and reference work:
