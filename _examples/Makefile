@@ -1,4 +1,7 @@
 SHELL = bash -o pipefail
 
-run:
-	go run cmd/main.go
+run-gcp:
+	go run cmd/gcp/main.go
+
+run-onepassword:
+	go run cmd/onepassword/main.go
