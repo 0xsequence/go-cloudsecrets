@@ -1,6 +1,7 @@
 # go-cloudsecrets
 
 Go package for hydrating config secrets from Cloud secret providers:
+- [x] [`aws`](./aws/) — AWS Secrets Manager
 - [x] [`gcp`](./gcp/README.md) — GCP Secret Manager
 - [x] [`env`](./env/README.md) — Environment variables (configurable prefix)
 - [x] [`onepassword`](./onepassword/README.md) — 1Password Secrets (service account)
