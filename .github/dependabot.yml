@@ -6,6 +6,7 @@ updates:
     directories:
       - "/"
       - "/_examples"
+      - "/tools"
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
